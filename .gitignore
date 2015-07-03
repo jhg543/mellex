@@ -1,0 +1,7 @@
+# exclude antlr parser generated files
+/src/main/java/io/github/jhg543/mellex/antlrparser/
+/target/
+/src/main/java/play/
+/.classpath
+/.settings
+/.project
