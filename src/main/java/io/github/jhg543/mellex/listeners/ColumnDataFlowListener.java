@@ -134,6 +134,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 						c.inf.copy(tc.inf);
 					}
 				}
+				ins.dbobj = stmt.dbobj;
 				ctx.insert = ins;
 			}
 		} else {
@@ -148,6 +149,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 				stmt.columns.add(c);
 			}
 		}
+		stmt.setVolatile(ctx.isvolatile);
 		provider.putTable(stmt, ctx.isvolatile);
 
 	}

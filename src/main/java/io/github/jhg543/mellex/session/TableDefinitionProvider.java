@@ -5,6 +5,7 @@ import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,6 +96,7 @@ public class TableDefinitionProvider {
 				log.warn("duplicate create table" + name);
 			}
 
+			
 			permanenttable.put(name, stmt);
 
 			String tblname = stmt.dbobj.ns.get(stmt.dbobj.ns.size() - 1);
@@ -102,6 +104,11 @@ public class TableDefinitionProvider {
 				c.put(tblname, DUPLICATE_MARKER);
 			}
 		}
+	}
+	
+	public Map<ObjectName, CreateTableStmt> getVolatileTables()
+	{
+		return Collections.unmodifiableMap(volatiletable);
 	}
 
 	public void clearinternal() {

@@ -5,6 +5,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLParser;
 import io.github.jhg543.mellex.listeners.ColumnDataFlowListener;
 import io.github.jhg543.mellex.listeners.PrintListener;
 import io.github.jhg543.mellex.listeners.TableDependencyListener;
+import io.github.jhg543.mellex.session.OutputGraphSession;
 import io.github.jhg543.mellex.session.ScriptBlockTableDependency;
 import io.github.jhg543.mellex.session.SortDependencySession;
 import io.github.jhg543.mellex.session.TableDefinitionProvider;
@@ -74,7 +75,7 @@ public class ObjectList {
 		return s.sort(null);
 	}
 
-	public static void viewColumnImpact(String sql, TableDefinitionProvider provider, Consumer<Exception> errors) {
+	public static void viewColumnImpact(String id,String sql, TableDefinitionProvider provider, OutputGraphSession outsession,PrintWriter out, Consumer<Exception> errors) {
 
 		AtomicInteger errorCount = new AtomicInteger();
 		ANTLRInputStream in = new ANTLRInputStream(sql);
@@ -95,9 +96,12 @@ public class ObjectList {
 		try {
 			ParseTree tree = parser.parse();
 			ParseTreeWalker w = new ParseTreeWalker();
+			outsession.newVolatileNamespace(id);
+			
 			ColumnDataFlowListener s = new ColumnDataFlowListener(provider);
 			w.walk(s, tree);
-			PrintListener p = new PrintListener(new PrintWriter(System.out), tokens);
+			provider.getVolatileTables().keySet().stream().forEach(x->outsession.putVolatileTable(x.toDotString()));
+			PrintListener p = new PrintListener(out, tokens,outsession);
 			w.walk(p, tree);
 			provider.clearinternal();
 		} catch (Exception e) {
