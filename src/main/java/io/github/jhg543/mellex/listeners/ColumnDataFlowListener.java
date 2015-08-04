@@ -238,7 +238,11 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		List<String> colnames = new ArrayList<>(ctx.cn.size());
 		for (int i = 0; i < ctx.cn.size(); ++i) {
-			colnames.add(ctx.cn.get(i).getText());
+			if (GlobalSettings.isCaseSensitive()) {
+				colnames.add(ctx.cn.get(i).getText());
+			} else {
+				colnames.add(ctx.cn.get(i).getText().toUpperCase());
+			}
 		}
 		List<Influences> exprs = new ArrayList<>(ctx.ex.size());
 		for (int i = 0; i < ctx.ex.size(); ++i) {
