@@ -30,7 +30,8 @@
  */
 grammar DefaultSQL;
 @header {
-  import io.github.jhg543.mellex.helperclass.*;
+  import io.github.jhg543.mellex.ASTHelper.*;
+  import java.util.Stack;
 }
 parse
  : ( (statement)? ';' )* EOF
@@ -738,6 +739,7 @@ unary_operator
  | '+'
  | '~'
  | K_NOT
+ | K_UNIQUE
  ;
 
 error_message

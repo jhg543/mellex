@@ -367,6 +367,10 @@ public class OutputGraphSession {
 		}
 	}
 
+	public void printJs(PrintWriter out) {
+		printJs(accDag, out);
+	}
+
 	public void printJs(NestedDAG gd, PrintWriter out) {
 		String formatgroup = "g.setNode('G%d', {label: '%s', clusterLabelPos: 'top', style: 'fill: #d3d7e8'});";
 		String formatcol = "g.setNode(%d, {label: '%s',height:20});";
@@ -401,7 +405,9 @@ public class OutputGraphSession {
 				if (leftedges != null) {
 					for (HalfEdge e : leftedges) {
 						if (e.getType() == HalfEdge.TYPE_DIRECT || e.getType() == HalfEdge.TYPE_INDIRECT) {
-							out.println(String.format(formatedge, leftid, e.getDest(), e.getType()));
+							if (i != e.getDest() / COL_MULTIPILER) {
+								out.println(String.format(formatedge, leftid, e.getDest(), e.getType()));
+							}
 						}
 					}
 				}
@@ -464,8 +470,10 @@ public class OutputGraphSession {
 
 		String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
 		for (Entry<Node> entry : collapsedPart.int2ObjectEntrySet()) {
+
 			int leftid = entry.getIntKey();
-			IntSet ce = commonEdges.get(leftid / COL_MULTIPILER);
+			int leftg = leftid / COL_MULTIPILER;
+			IntSet ce = commonEdges.get(leftg);
 			for (HalfEdge e : entry.getValue().getOutEdges()) {
 				if (e.getType() == HalfEdge.TYPE_DIRECT || e.getType() == HalfEdge.TYPE_INDIRECT) {
 					if (e.getType() == HalfEdge.TYPE_DIRECT || !ce.contains(e.getDest())) {
@@ -482,7 +490,9 @@ public class OutputGraphSession {
 								out.println(String.format(formatcol, i, columns.get(xi).get(xj)));
 								out.println(String.format(formatparent, i, xi));
 							}
-							out.println(String.format(formatedge, leftid, e.getDest(), e.getType()));
+							if (g != leftg) {
+								out.println(String.format(formatedge, leftid, e.getDest(), e.getType()));
+							}
 						}
 						collapsedDag.addEdge(leftid, e);
 					}
@@ -558,7 +568,9 @@ public class OutputGraphSession {
 		String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
 		edges.forEach((x, y) -> {
 			y.forEach(z -> {
-				out.println(String.format(formatedge, x, z.getDest(), z.getType()));
+				if (x / COL_MULTIPILER != z.getDest() / COL_MULTIPILER) {
+					out.println(String.format(formatedge, x, z.getDest(), z.getType()));
+				}
 			});
 		});
 

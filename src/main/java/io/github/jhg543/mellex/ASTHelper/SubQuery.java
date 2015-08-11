@@ -273,7 +273,12 @@ public class SubQuery {
 		for (ObjectName name : ur.direct) {
 			ResultColumn n = rcalias.get(name.ns.get(0));
 			if (n == null) {
-				log.error("Column" + name + "not found");
+				// TD SPECIFIC
+				if (name.ns.size() == 1 && name.ns.get(0).equals("DATE")) {
+
+				} else {
+					log.error("Column" + name + "not found");
+				}
 			} else {
 				rewriteResultColumn(n, rcalias);
 				c.inf.copy(n.inf);
@@ -283,7 +288,12 @@ public class SubQuery {
 		for (ObjectName name : ur.indirect) {
 			ResultColumn n = rcalias.get(name.ns.get(0));
 			if (n == null) {
-				log.error("Column" + name + "not found");
+				// TD SPECIFIC
+				if (name.ns.size() == 1 && name.ns.get(0).equals("DATE")) {
+
+				} else {
+					log.error("Column" + name + "not found");
+				}
 			} else {
 				rewriteResultColumn(n, rcalias);
 				c.inf.copypoi(n.inf);

@@ -2,13 +2,13 @@ package io.github.jhg543.mellex.operation;
 
 import io.github.jhg543.mellex.antlrparser.DefaultSQLLexer;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser;
+import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.ColumnDataFlowListener;
 import io.github.jhg543.mellex.listeners.PrintListener;
 import io.github.jhg543.mellex.listeners.TableDependencyListener;
 import io.github.jhg543.mellex.session.OutputGraphSession;
 import io.github.jhg543.mellex.session.ScriptBlockTableDependency;
 import io.github.jhg543.mellex.session.SortDependencySession;
-import io.github.jhg543.mellex.session.TableDefinitionProvider;
 import io.github.jhg543.mellex.session.TableDependencySession;
 
 import java.io.PrintWriter;
@@ -99,7 +99,7 @@ public class ObjectList {
 			ParseTreeWalker w = new ParseTreeWalker();
 			outsession.newVolatileNamespace(id);
 
-			ColumnDataFlowListener s = new ColumnDataFlowListener(provider);
+			ColumnDataFlowListener s = new ColumnDataFlowListener(provider,tokens);
 			w.walk(s, tree);
 			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x.toDotString()));
 			PrintListener p = new PrintListener(out, tokens, outsession);

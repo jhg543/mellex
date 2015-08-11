@@ -33,6 +33,7 @@ public class PrintListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitSql_stmt(Sql_stmtContext ctx) {
 
+		String sql = stream.getText(ctx.getSourceInterval());
 		super.exitSql_stmt(ctx);
 		if (ctx.insert_stmt() != null) {
 			out.println("###-----------Insert statement---------------");

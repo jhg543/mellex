@@ -1,4 +1,4 @@
-package io.github.jhg543.mellex.session;
+package io.github.jhg543.mellex.inputsource;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
@@ -13,14 +13,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TableDefinitionProvider {
+public class PureScriptTableDefinitionProvider implements TableDefinitionProvider {
 
 	Map<ObjectName, CreateTableStmt> permanenttable = new ConcurrentHashMap<>();
 	Map<ObjectName, CreateTableStmt> volatiletable = new ConcurrentHashMap<>();
 	Map<String, CreateTableStmt> c = new ConcurrentHashMap<>();
 	CreateTableStmt DUPLICATE_MARKER = new CreateTableStmt();
-	private static final Logger log = LoggerFactory.getLogger(TableDefinitionProvider.class);
+	private static final Logger log = LoggerFactory.getLogger(PureScriptTableDefinitionProvider.class);
 
+	/* (non-Javadoc)
+	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#queryTable(io.github.jhg543.mellex.ASTHelper.ObjectName)
+	 */
+	@Override
 	public CreateTableStmt queryTable(ObjectName name2) {
 
 		ObjectName name = new ObjectName();
@@ -73,6 +77,10 @@ public class TableDefinitionProvider {
 		return result;
 	}
 
+	/* (non-Javadoc)
+	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#putTable(io.github.jhg543.mellex.ASTHelper.CreateTableStmt, boolean)
+	 */
+	@Override
 	public void putTable(CreateTableStmt stmt, boolean isvolatile) {
 
 		ObjectName name = new ObjectName();
@@ -106,11 +114,19 @@ public class TableDefinitionProvider {
 		}
 	}
 	
+	/* (non-Javadoc)
+	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#getVolatileTables()
+	 */
+	@Override
 	public Map<ObjectName, CreateTableStmt> getVolatileTables()
 	{
 		return Collections.unmodifiableMap(volatiletable);
 	}
 
+	/* (non-Javadoc)
+	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#clearinternal()
+	 */
+	@Override
 	public void clearinternal() {
 		volatiletable.clear();
 	}

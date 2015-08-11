@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.antlr.v4.runtime.RuleContext;
+import org.antlr.v4.runtime.TokenStream;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
@@ -60,15 +61,25 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Update_stmt_fromCont
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Update_stmt_setContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Where_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.WindowContext;
-import io.github.jhg543.mellex.session.TableDefinitionProvider;
+import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 
 public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 	private TableDefinitionProvider provider;
+	private TokenStream stream;
+	private String current_sql;
 
-	public ColumnDataFlowListener(TableDefinitionProvider provider) {
+	@Override
+	public void enterSql_stmt(Sql_stmtContext ctx) {
+		
+		super.enterSql_stmt(ctx);
+		current_sql = stream.getText(ctx.getSourceInterval());
+	}
+
+	public ColumnDataFlowListener(TableDefinitionProvider provider,TokenStream stream) {
 		super();
 		this.provider = provider;
+		this.stream = stream;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -219,7 +230,8 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		}
 		ctx.insert = ins;
-
+		stmt.setViewDef(ins);
+		
 		provider.putTable(stmt, false);
 
 	}
@@ -321,7 +333,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		List<SubQuery> temp = new ArrayList<>();
 		temp.add(targetTable);
 		q.resolvenames(tables, new ArrayList<Integer>(), temp);
-
+		q.dbobj= targetTable.dbobj;
 	}
 
 	@Override
