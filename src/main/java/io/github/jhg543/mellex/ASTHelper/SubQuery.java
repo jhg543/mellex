@@ -156,7 +156,7 @@ public class SubQuery {
 				} else if (c.name.contains("(*)")) {
 					// throw new RuntimeException("unknown count(*) " + c.name);
 					// count (*) ---> depends on where clause
-					System.out.println("WARN: Count(*) FOUND");
+					log.warn(" Count(*) FOUND");
 					expandasterisk.add(c);
 				} else {
 					expandasterisk.add(c);
@@ -265,7 +265,7 @@ public class SubQuery {
 		}
 
 		if (c.unresolvedNames.isempty()) {
-			throw new RuntimeException("cycle reference" + c.name);
+			throw new RuntimeException("cycle reference or can not determine " + c.name);
 		}
 
 		Influences ur = c.unresolvedNames;

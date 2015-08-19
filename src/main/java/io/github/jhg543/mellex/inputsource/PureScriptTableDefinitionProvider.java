@@ -21,8 +21,12 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 	CreateTableStmt DUPLICATE_MARKER = new CreateTableStmt();
 	private static final Logger log = LoggerFactory.getLogger(PureScriptTableDefinitionProvider.class);
 
-	/* (non-Javadoc)
-	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#queryTable(io.github.jhg543.mellex.ASTHelper.ObjectName)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * io.github.jhg543.mellex.inputsource.TableDefinitionProvider#queryTable
+	 * (io.github.jhg543.mellex.ASTHelper.ObjectName)
 	 */
 	@Override
 	public CreateTableStmt queryTable(ObjectName name2) {
@@ -32,9 +36,16 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 
 		if (name.ns.size() > 1) {
 			String x = name.ns.get(0);
-			if (x.charAt(0) == '$' && x.charAt(1) != '{') {
-				name.ns.set(0, "${" + x.substring(1) + "}");
+			if (x.charAt(0) == '$') {
+				if (x.charAt(1) == '{') {
+					name.ns.set(0, x.substring(2, x.length() - 1));
+				} else {
+					name.ns.set(0, x.substring(1));
+				}
 			}
+			// if (x.charAt(0) == '$' && x.charAt(1) != '{') {
+			// name.ns.set(0, "${" + x.substring(1) + "}");
+			// }
 		}
 
 		CreateTableStmt result = null;
@@ -77,8 +88,12 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 		return result;
 	}
 
-	/* (non-Javadoc)
-	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#putTable(io.github.jhg543.mellex.ASTHelper.CreateTableStmt, boolean)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * io.github.jhg543.mellex.inputsource.TableDefinitionProvider#putTable(
+	 * io.github.jhg543.mellex.ASTHelper.CreateTableStmt, boolean)
 	 */
 	@Override
 	public void putTable(CreateTableStmt stmt, boolean isvolatile) {
@@ -88,9 +103,16 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 
 		if (name.ns.size() > 1) {
 			String x = name.ns.get(0);
-			if (x.charAt(0) == '$' && x.charAt(1) != '{') {
-				name.ns.set(0, "${" + x.substring(1) + "}");
+			if (x.charAt(0) == '$') {
+				if (x.charAt(1) == '{') {
+					name.ns.set(0, x.substring(2, x.length() - 1));
+				} else {
+					name.ns.set(0, x.substring(1));
+				}
 			}
+			// if (x.charAt(0) == '$' && x.charAt(1) != '{') {
+			// name.ns.set(0, "${" + x.substring(1) + "}");
+			// }
 		}
 
 		if (isvolatile) {
@@ -104,7 +126,6 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 				log.warn("duplicate create table" + name);
 			}
 
-			
 			permanenttable.put(name, stmt);
 
 			String tblname = stmt.dbobj.ns.get(stmt.dbobj.ns.size() - 1);
@@ -113,18 +134,25 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 			}
 		}
 	}
-	
-	/* (non-Javadoc)
-	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#getVolatileTables()
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * io.github.jhg543.mellex.inputsource.TableDefinitionProvider#getVolatileTables
+	 * ()
 	 */
 	@Override
-	public Map<ObjectName, CreateTableStmt> getVolatileTables()
-	{
+	public Map<ObjectName, CreateTableStmt> getVolatileTables() {
 		return Collections.unmodifiableMap(volatiletable);
 	}
 
-	/* (non-Javadoc)
-	 * @see io.github.jhg543.mellex.inputsource.TableDefinitionProvider#clearinternal()
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * io.github.jhg543.mellex.inputsource.TableDefinitionProvider#clearinternal
+	 * ()
 	 */
 	@Override
 	public void clearinternal() {

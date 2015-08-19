@@ -62,6 +62,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Update_stmt_setConte
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Where_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.WindowContext;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
+import io.github.jhg543.mellex.util.Misc;
 
 public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
@@ -71,12 +72,12 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 	@Override
 	public void enterSql_stmt(Sql_stmtContext ctx) {
-		
+
 		super.enterSql_stmt(ctx);
 		current_sql = stream.getText(ctx.getSourceInterval());
 	}
 
-	public ColumnDataFlowListener(TableDefinitionProvider provider,TokenStream stream) {
+	public ColumnDataFlowListener(TableDefinitionProvider provider, TokenStream stream) {
 		super();
 		this.provider = provider;
 		this.stream = stream;
@@ -160,7 +161,11 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 				stmt.columns.add(c);
 			}
 		}
+		if (Misc.isvolatile(stmt.dbobj)) {
+			ctx.isvolatile = true;
+		}
 		stmt.setVolatile(ctx.isvolatile);
+
 		provider.putTable(stmt, ctx.isvolatile);
 
 	}
@@ -230,8 +235,9 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		}
 		ctx.insert = ins;
+		ins.dbobj = stmt.dbobj;
 		stmt.setViewDef(ins);
-		
+
 		provider.putTable(stmt, false);
 
 	}
@@ -333,7 +339,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		List<SubQuery> temp = new ArrayList<>();
 		temp.add(targetTable);
 		q.resolvenames(tables, new ArrayList<Integer>(), temp);
-		q.dbobj= targetTable.dbobj;
+		q.dbobj = targetTable.dbobj;
 	}
 
 	@Override

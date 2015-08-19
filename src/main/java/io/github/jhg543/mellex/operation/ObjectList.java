@@ -5,6 +5,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLParser;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.ColumnDataFlowListener;
 import io.github.jhg543.mellex.listeners.PrintListener;
+import io.github.jhg543.mellex.listeners.TableDataFlowListener;
 import io.github.jhg543.mellex.listeners.TableDependencyListener;
 import io.github.jhg543.mellex.session.OutputGraphSession;
 import io.github.jhg543.mellex.session.ScriptBlockTableDependency;
@@ -109,5 +110,37 @@ public class ObjectList {
 			errors.accept(e);
 		}
 	}
+	
+	public static void viewTableImpact(String id, String sql, TableDefinitionProvider provider, OutputGraphSession outsession,
+			PrintWriter out, Consumer<Exception> errors) {
 
+		AtomicInteger errorCount = new AtomicInteger();
+		ANTLRInputStream in = new ANTLRInputStream(sql);
+		DefaultSQLLexer lexer = new DefaultSQLLexer(in);
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		DefaultSQLParser parser = new DefaultSQLParser(tokens);
+		parser.removeErrorListeners();
+		parser.addErrorListener(new BaseErrorListener() {
+			@Override
+			public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine,
+					String msg, RecognitionException e) {
+				errors.accept(new RuntimeException("line" + line + ":" + charPositionInLine + "at" + offendingSymbol + ":"
+						+ msg));
+				errorCount.incrementAndGet();
+			}
+
+		});
+		try {
+			ParseTree tree = parser.parse();
+			ParseTreeWalker w = new ParseTreeWalker();
+			outsession.newVolatileNamespace(id);
+
+			TableDataFlowListener s = new TableDataFlowListener(provider,tokens,outsession);
+			w.walk(s, tree);
+			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x.toDotString()));
+			provider.clearinternal();
+		} catch (Exception e) {
+			errors.accept(e);
+		}
+	}
 }

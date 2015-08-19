@@ -4,6 +4,7 @@ import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
 import io.github.jhg543.mellex.util.DAG;
+import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.mellex.util.NestedDAG;
 import io.github.jhg543.mellex.util.HalfEdge;
 import io.github.jhg543.mellex.util.Node;
@@ -79,6 +80,11 @@ public class OutputGraphSession {
 			return id;
 		}
 
+		if (Misc.isvolatile(name))
+		{
+			putVolatileTable(name);
+			return volatileTableIds.get(name);
+		}
 		id = tableIds.get(name);
 		if (id != null) {
 			return id;
@@ -584,6 +590,40 @@ public class OutputGraphSession {
 		});
 	}
 
+
+	public void printTableNestedDAG(PrintWriter out) {
+		NestedDAG nestedDAG = collapsedDag;
+		Map<Integer, List<HalfEdge>> edges = nestedDAG.getAllEdges();
+
+		IntSet nodes = new IntOpenHashSet();
+		String formatcol = "g.setNode(%d, {label: '%s',height:20});";
+		
+
+		edges.forEach((x, y) -> {
+			nodes.add(x.intValue());
+			y.forEach(z -> {
+				nodes.add(z.getDest());
+			});
+		});
+
+		
+		for (int i : nodes) {
+			int xi = i / COL_MULTIPILER;
+			int xj = i % COL_MULTIPILER;
+			out.println(String.format(formatcol, i, tablenames.get(xi)));
+		}
+
+		String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
+		edges.forEach((x, y) -> {
+			y.forEach(z -> {
+				if (x / COL_MULTIPILER != z.getDest() / COL_MULTIPILER) {
+					out.println(String.format(formatedge, x, z.getDest(), z.getType()));
+				}
+			});
+		});
+
+	}	
+	
 	public int getLastTableid() {
 		return lastTableid;
 	}

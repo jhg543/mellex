@@ -48,7 +48,7 @@ public class Influences {
 		direct = new ArrayList<>(d1);
 		indirect = new ArrayList<>(i1);
 	}
-
+	
 	public boolean isempty() {
 		return direct.size() + indirect.size() == 0;
 	}

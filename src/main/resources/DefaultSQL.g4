@@ -66,7 +66,7 @@ K_ET
  ;
 
 set_stmt
- : K_SET any_name ASSIGN any_name K_FOR any_name
+ : K_SET any_name ASSIGN any_name ( K_FOR any_name )?
  ;
 
 database_stmt
@@ -118,6 +118,7 @@ locals [ Stack<SubQuery> cte_stack = new Stack<>() ]
                                       | rename_table_stmt
                                       | drop_macro_stmt
                                       | create_macro_stmt
+                                      | truncate_table_stmt
                                       )
  ;
 
@@ -176,7 +177,7 @@ create_index_stmt
 
 create_table_stmt
 returns [ CreateTableStmt stmt = new CreateTableStmt(), boolean isvolatile = false, InsertStmt insert ]
- : K_CREATE (( K_MULTISET | K_SET ) | ( K_VOLATILE {$isvolatile = true;} | (K_GLOBAL K_TEMPORARY) ))* K_TABLE ( K_IF K_NOT K_EXISTS )?
+ : K_CREATE (( K_MULTISET | K_SET ) | ( K_VOLATILE {$isvolatile = true;} | (K_GLOBAL? ( K_TEMPORARY | K_TEMP ) {$isvolatile = true;}) ))* K_TABLE ( K_IF K_NOT K_EXISTS )?
    obj=object_name create_table_options (def=column_defs | st=create_source_table )+  create_table_stmt_C_to_D
  ;
 
@@ -186,8 +187,9 @@ returns [List<String> colnames]
  ;
 
 create_source_table
-returns [ SubQuery q, boolean nodata = false ]
- : K_AS ( obj=object_name  | '(' ss=select_stmt ')' ) K_WITH ( K_NO {$nodata = true;} )?  K_DATA
+returns [ SubQuery q, boolean nodata = true ]
+ : K_AS ( obj=object_name  | '(' ss=select_stmt ')' /*TD*/ | ss=select_stmt /*GP*/ ) ( K_WITH {$nodata = false;} ( K_NO {$nodata = true;} )?  K_DATA /*TD*/)?
+ | '(' K_LIKE obj=object_name ')' /* GP */
  ;
 create_table_options
  : ( ',' create_table_option )*
@@ -217,7 +219,7 @@ create_trigger_stmt
 create_view_stmt
 returns [ CreateTableStmt stmt = new CreateTableStmt(), InsertStmt insert ]
  : ( K_CREATE | K_REPLACE | K_CREATE K_OR K_REPLACE /*  POSTGRES */ ) ( K_TEMP | K_TEMPORARY )? K_VIEW ( K_IF K_NOT K_EXISTS )?
-   obj=object_name ( '(' cn+=column_name ( ',' cn+=column_name )* ')' )? K_AS locking_option* ss=select_stmt
+   obj=object_name ( '(' cn+=column_name ( ',' cn+=column_name )* ')' )? K_AS? /*TD = MUST AS GP = NO AS*/ locking_option* ss=select_stmt
  ;
 
 locking_option
@@ -230,7 +232,7 @@ create_virtual_table_stmt
  ;
 
 delete_stmt
- : with_clause? (K_DELETE | K_DEL) object_name? K_FROM? qualified_table_name (K_AS? table_alias)? ( ',' qualified_table_name (K_AS? table_alias)? )*
+ : with_clause? (K_DELETE | K_DEL) object_name? K_FROM? qualified_table_name (K_AS? table_alias)? ( (',' | K_USING /* LAZY */) qualified_table_name (K_AS? table_alias)? )*
    ( (K_WHERE expr) | K_ALL  )?
  ;
 
@@ -250,6 +252,10 @@ detach_stmt
 
 drop_index_stmt
  : K_DROP K_INDEX ( K_IF K_EXISTS )? ( database_name '.' )? index_name
+ ;
+
+truncate_table_stmt
+ : K_TRUNCATE K_TABLE ( database_name '.' )? table_name
  ;
 
 drop_table_stmt
@@ -524,7 +530,7 @@ returns [ Influences inf ]
  | K_RANK '(' operand1=expr ( K_ASC | K_DESC )? ')'/*unary*/ #special_function1
  | K_SUBSTRING '(' operand1=expr K_FROM operand2=expr (K_FOR operand3=expr)? ')' /*arithmetic3*/ #special_functionSubString
  | K_TRANSLATE_CHK '(' operand1=expr K_USING IDENTIFIER ')' /*unary*/ #special_function1
- | ( K_DATE | K_TIME ) STRING_LITERAL /*nothing*/  #special_functionDateTime
+ | ( K_DATE | K_TIME | K_INTERVAL ) STRING_LITERAL /*nothing*/  #special_functionDateTime
 
  ;
 
@@ -1180,6 +1186,8 @@ K_HOUR: H O U R;
 K_SECOND: S E C O N D;
 K_SAMPLE: S A M P L E;
 K_MACRO: M A C R O;
+K_TRUNCATE: T R U N C A T E;
+K_INTERVAL: I N T E R V A L;
 
 IDENTIFIER
  : '"' (~'"' | '""')* '"'
