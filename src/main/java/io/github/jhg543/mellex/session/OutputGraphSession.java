@@ -1,5 +1,6 @@
 package io.github.jhg543.mellex.session;
 
+import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
@@ -35,6 +36,7 @@ public class OutputGraphSession {
 	private AtomicInteger groupIdGenerator = new AtomicInteger(0);
 	private AtomicInteger stmtIdGenerator = new AtomicInteger(0);
 	private List<String> tablenames = new ArrayList<String>();
+	private Map<Integer,Integer> tableprop = new HashMap<Integer,Integer>();
 	private Map<String, Integer> volatileTableIds = new HashMap<String, Integer>();
 	private Map<String, Integer> tableIds = new HashMap<String, Integer>();;
 	private String volatileNamespace;
@@ -45,9 +47,9 @@ public class OutputGraphSession {
 	// HashMap<Integer, List<HalfEdge>>();
 	private List<List<Integer>> groupedges = new ArrayList<>();
 
-	private NestedDAG collapsedDag = new NestedDAG();
-	private NestedDAG accDag = new NestedDAG();
-	private DAG currentDag;
+	private NestedDAG overallCollapsedDag = new NestedDAG();
+	private NestedDAG overallDag = new NestedDAG();
+	private DAG currentSessionDag;
 
 	// in case circular dependency, pick last table as root
 	private int lastTableid;
@@ -61,7 +63,7 @@ public class OutputGraphSession {
 	public void newVolatileNamespace(String namespace) {
 		volatileTableIds.clear();
 		volatileNamespace = namespace + ".";
-		currentDag = new DAG();
+		currentSessionDag = new DAG();
 	}
 
 	public void putVolatileTable(String name) {
@@ -75,13 +77,13 @@ public class OutputGraphSession {
 	}
 
 	private Integer convertTableName(String name) {
+		name = Misc.nameSym(name);
 		Integer id = volatileTableIds.get(name);
 		if (id != null) {
 			return id;
 		}
 
-		if (Misc.isvolatile(name))
-		{
+		if (Misc.isvolatile(name)) {
 			putVolatileTable(name);
 			return volatileTableIds.get(name);
 		}
@@ -151,6 +153,7 @@ public class OutputGraphSession {
 		addFlow(q, stmtid);
 	}
 
+	/*
 	public void addFlow(String tablename, List<String> colnames, List<List<String>> direct, List<List<String>> indirect,
 			int stmtid) {
 		Preconditions.checkNotNull(tablename, "Src table is null");
@@ -200,7 +203,7 @@ public class OutputGraphSession {
 		}
 
 		for (Integer i : cis) {
-			accDag.addGroupEdge(leftTableid, i, HalfEdge.TYPE_INDIRECT, stmtid);
+			overallDag.addGroupEdge(leftTableid, i, HalfEdge.TYPE_INDIRECT, stmtid);
 		}
 		for (int i = 0; i < colnames.size(); ++i) {
 			String leftcolname = colnames.get(i);
@@ -216,9 +219,9 @@ public class OutputGraphSession {
 			for (int j = indirectlen; j < outColids.length; ++j) {
 				int cid = outColids[i][j];
 				HalfEdge hf = new HalfEdge(cid, HalfEdge.TYPE_DIRECT, stmtid);
-				currentDag.addEdge(leftid, hf);
+				currentSessionDag.addEdge(leftid, hf);
 				if (!cis.contains(cid)) {
-					accDag.addEdge(leftid, hf);
+					overallDag.addEdge(leftid, hf);
 				}
 
 			}
@@ -226,16 +229,16 @@ public class OutputGraphSession {
 				int cid = outColids[i][j];
 
 				HalfEdge hf = new HalfEdge(cid, HalfEdge.TYPE_INDIRECT, stmtid);
-				currentDag.addEdge(leftid, hf);
+				currentSessionDag.addEdge(leftid, hf);
 				if (!cis.contains(cid)) {
-					accDag.addEdge(leftid, hf);
+					overallDag.addEdge(leftid, hf);
 				}
 
 			}
 
 		}
 	}
-
+*/
 	public void addFlow(SubQuery q, int stmtid) {
 
 		if (q == null) {
@@ -246,6 +249,15 @@ public class OutputGraphSession {
 			throw new RuntimeException("dbobj null");
 		}
 		int leftTableid = convertTableName(q.dbobj.toString());
+		if (q instanceof CreateTableStmt)
+		{
+			CreateTableStmt stmt = (CreateTableStmt)q;
+			if (stmt.getViewDef()!=null)
+			{
+				tableprop.put(leftTableid, 1);
+			}
+		}
+		
 		List<String> leftTableCols = columns.get(leftTableid);
 		setLastTableid(leftTableid);
 		Integer[][] outColids;
@@ -290,7 +302,7 @@ public class OutputGraphSession {
 		}
 
 		for (Integer i : cis) {
-			accDag.addGroupEdge(leftTableid, i, HalfEdge.TYPE_INDIRECT, stmtid);
+			overallDag.addGroupEdge(leftTableid, i, HalfEdge.TYPE_INDIRECT, stmtid);
 		}
 		for (int i = 0; i < q.columns.size(); ++i) {
 			ResultColumn c = q.columns.get(i);
@@ -306,18 +318,18 @@ public class OutputGraphSession {
 
 			for (int j = indirectlen; j < outColids[i].length; ++j) {
 				int cid = outColids[i][j];
-				currentDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
+				currentSessionDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
 				if (!cis.contains(cid)) {
-					accDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
+					overallDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
 				}
 
 			}
 			for (int j = 0; j < indirectlen; ++j) {
 				int cid = outColids[i][j];
-				currentDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
+				currentSessionDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
 
 				if (!cis.contains(cid)) {
-					accDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
+					overallDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
 				}
 
 			}
@@ -340,7 +352,7 @@ public class OutputGraphSession {
 						out.print(' ');
 						out.print(e.getType());
 						out.print(' ');
-						out.print(e.getStatementid());
+						out.print(e.getMarker());
 						out.println();
 					}
 				}
@@ -373,8 +385,8 @@ public class OutputGraphSession {
 		}
 	}
 
-	public void printJs(PrintWriter out) {
-		printJs(accDag, out);
+	public void printOverallJs(PrintWriter out) {
+		printJs(overallDag, out);
 	}
 
 	public void printJs(NestedDAG gd, PrintWriter out) {
@@ -421,33 +433,49 @@ public class OutputGraphSession {
 		}
 	}
 
-	public void recordAndPrintCollapseJs(PrintWriter out) {
-		int stmtid = stmtIdGenerator.get();
+
+	public void printCurrentSessionGroupJs(PrintWriter out,int edgemarker)
+	{
+		Int2ObjectMap<Node> edges = currentSessionDag.listAllEdges();
+		printEdgeJs(edges, out,false,edgemarker);
+	}
+	
+	public void recordAndPrintCollapseJs(PrintWriter out,int edgemarker) {
+		//int stmtid = stmtIdGenerator.get();
+
+		// Mark volatile tables
 		volatileTableIds.values().forEach(x -> {
 			List<String> colnames = columns.get(x);
 			for (int i = 0; i < colnames.size(); ++i) {
-				currentDag.setPerm(x * COL_MULTIPILER + i, false);
+				currentSessionDag.setPerm(x * COL_MULTIPILER + i, false);
 			}
 		});
-		Int2ObjectMap<Node> collapsedPart = currentDag.collapse(stmtid);
+		Int2ObjectMap<Node> collapsedPart = currentSessionDag.collapse(edgemarker);
+		printEdgeJs(collapsedPart, out,true,edgemarker);
+	}
+
+	private void printEdgeJs(Int2ObjectMap<Node> edges, PrintWriter out, boolean record,int commonEdgeIDtoWrite) {
+		
 		Int2ObjectMap<IntSet> commonEdges = new Int2ObjectOpenHashMap<IntSet>();
 
-		for (Entry<Node> entry : collapsedPart.int2ObjectEntrySet()) {
+		for (Entry<Node> entry : edges.int2ObjectEntrySet()) {
 
-			IntSet s = new IntOpenHashSet(entry.getValue().getOutEdges().size());
+			// get destination list
+			IntSet currentNodeDestinations = new IntOpenHashSet(entry.getValue().getOutEdges().size());
 			for (HalfEdge e : entry.getValue().getOutEdges()) {
-				s.add(e.getDest());
+				currentNodeDestinations.add(e.getDest());
 			}
 
-			int x = entry.getIntKey() / COL_MULTIPILER;
-			if (commonEdges.containsKey(x)) {
-				commonEdges.get(x).retainAll(s);
+			int groupid = entry.getIntKey() / COL_MULTIPILER;
+			if (commonEdges.containsKey(groupid)) {
+				commonEdges.get(groupid).retainAll(currentNodeDestinations);
 			} else {
-				commonEdges.put(x, s);
+				commonEdges.put(groupid, currentNodeDestinations);
 			}
 
 		}
 
+		// single column = no "ALL COLUMN"
 		for (int i : commonEdges.keySet().toIntArray()) {
 			if (columns.get(i).size() == 1) {
 				commonEdges.remove(i);
@@ -455,85 +483,100 @@ public class OutputGraphSession {
 		}
 
 		IntSet nodes = new IntOpenHashSet();
-		Set<Integer> groups = collapsedPart.keySet().stream().map(x -> x / COL_MULTIPILER).collect(Collectors.toSet());
-		String formatgroup = "g.setNode('G%d', {label: '%s', clusterLabelPos: 'top', style: 'fill: #d3d7e8'});";
-		String formatcol = "g.setNode(%d, {label: '%s',height:20});";
-		String formatparent = "g.setParent(%d, 'G%d');";
+		Set<Integer> groups = edges.keySet().stream().map(x -> x / COL_MULTIPILER).collect(Collectors.toSet());
+		String stringTemplate_group = "g.setNode('G%d', {label: '%s', clusterLabelPos: 'top', style: 'fill: #d3d7e8'});";
+		String stringTemplate_column = "g.setNode(%d, {label: '%s',height:20});";
+		String stringTemplate_setparent = "g.setParent(%d, 'G%d');";
+
 		if (out != null) {
+			// create left group nodes
 			for (int i : groups) {
-				out.println(String.format(formatgroup, i, tablenames.get(i)));
+				out.println(String.format(stringTemplate_group, i, tablenames.get(i)));
 			}
 
-			for (int i : collapsedPart.keySet()) {
+			// create left columns node
+			for (int i : edges.keySet()) {
 				if (nodes.add(i)) {
 					int xi = i / COL_MULTIPILER;
 					int xj = i % COL_MULTIPILER;
-					out.println(String.format(formatcol, i, columns.get(xi).get(xj)));
-					out.println(String.format(formatparent, i, xi));
+					out.println(String.format(stringTemplate_column, i, columns.get(xi).get(xj)));
+					out.println(String.format(stringTemplate_setparent, i, xi));
 				}
 			}
 		}
 
-		String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
-		for (Entry<Node> entry : collapsedPart.int2ObjectEntrySet()) {
+		String stringTemplate_edge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
+		for (Entry<Node> entry : edges.int2ObjectEntrySet()) {
 
 			int leftid = entry.getIntKey();
-			int leftg = leftid / COL_MULTIPILER;
-			IntSet ce = commonEdges.get(leftg);
+			int leftcolgroupid = leftid / COL_MULTIPILER;
+			IntSet commonEdgesofLeft = commonEdges.get(leftcolgroupid);
 			for (HalfEdge e : entry.getValue().getOutEdges()) {
 				if (e.getType() == HalfEdge.TYPE_DIRECT || e.getType() == HalfEdge.TYPE_INDIRECT) {
-					if (e.getType() == HalfEdge.TYPE_DIRECT || !ce.contains(e.getDest())) {
-						if (out != null) {
-							int g = e.getDest() / COL_MULTIPILER;
-							if (groups.add(g)) {
-								out.println(String.format(formatgroup, g, tablenames.get(g)));
 
+					if (e.getType() == HalfEdge.TYPE_DIRECT || !commonEdgesofLeft.contains(e.getDest())) {
+						if (out != null) {
+							int rightgroupid = e.getDest() / COL_MULTIPILER;
+
+							// lazy creation of right groups
+							if (groups.add(rightgroupid)) {
+								out.println(String.format(stringTemplate_group, rightgroupid, tablenames.get(rightgroupid)));
 							}
+
+							// lazy creation of right columns
 							if (nodes.add(e.getDest())) {
 								int i = e.getDest();
 								int xi = i / COL_MULTIPILER;
 								int xj = i % COL_MULTIPILER;
-								out.println(String.format(formatcol, i, columns.get(xi).get(xj)));
-								out.println(String.format(formatparent, i, xi));
+								out.println(String.format(stringTemplate_column, i, columns.get(xi).get(xj)));
+								out.println(String.format(stringTemplate_setparent, i, xi));
 							}
-							if (g != leftg) {
-								out.println(String.format(formatedge, leftid, e.getDest(), e.getType()));
+
+							// print edge
+							if (rightgroupid != leftcolgroupid) {
+								out.println(String.format(stringTemplate_edge, leftid, e.getDest(), e.getType()));
 							}
 						}
-						collapsedDag.addEdge(leftid, e);
+
+						// add to all
+						if (record) {
+							overallCollapsedDag.addEdge(leftid, e);
+						}
 					}
 				}
 			}
 
 		}
 
-		commonEdges.forEach((x, y) -> {
+		commonEdges.forEach((srcnodeid, outedges) -> {
 			if (out != null) {
-				out.println(String.format("g.setNode('A%d', {label: 'Any Column',style: 'fill: #d3e7e8'});", x));
-				out.println(String.format("g.setParent('A%d', 'G%d');", x, x));
+				out.println(String.format("g.setNode('A%d', {label: 'Any Column',style: 'fill: #d3e7e8'});", srcnodeid));
+				out.println(String.format("g.setParent('A%d', 'G%d');", srcnodeid, srcnodeid));
 			}
-			y.forEach(z -> {
+			outedges.forEach(destnodeid -> {
 				if (out != null) {
-					if (nodes.add(z)) {
-						int i = z;
+					if (nodes.add(destnodeid)) {
+						int i = destnodeid;
 						int xi = i / COL_MULTIPILER;
 						int xj = i % COL_MULTIPILER;
-						out.println(String.format(formatcol, i, columns.get(xi).get(xj)));
-						int g = z / COL_MULTIPILER;
-						if (groups.add(g)) {
-							out.println(String.format(formatgroup, g, tablenames.get(g)));
+						out.println(String.format(stringTemplate_column, i, columns.get(xi).get(xj)));
+						int destnodegroup = destnodeid / COL_MULTIPILER;
+						if (groups.add(destnodegroup)) {
+							out.println(String.format(stringTemplate_group, destnodegroup, tablenames.get(destnodegroup)));
 						}
-						out.println(String.format(formatparent, i, xi));
+						out.println(String.format(stringTemplate_setparent, i, xi));
 					}
-					out.println(String.format("g.setEdge('A%d', %d, {class:'z1-aap'});", x, z));
+					out.println(String.format("g.setEdge('A%d', %d, {class:'z1-aap'});", srcnodeid, destnodeid));
 				}
-				collapsedDag.addGroupEdge(x, z, HalfEdge.TYPE_INDIRECT, stmtid);
+				if (record) {
+					overallCollapsedDag.addGroupEdge(srcnodeid, destnodeid, HalfEdge.TYPE_INDIRECT, commonEdgeIDtoWrite);
+				}
 			});
 		});
 	}
 
 	public void printNestedDAG(PrintWriter out) {
-		NestedDAG nestedDAG = collapsedDag;
+		NestedDAG nestedDAG = overallCollapsedDag;
 		Map<Integer, List<HalfEdge>> edges = nestedDAG.getAllEdges();
 		Map<Integer, List<HalfEdge>> gcedges = nestedDAG.getAllGroupToColumnEdges();
 
@@ -590,15 +633,14 @@ public class OutputGraphSession {
 		});
 	}
 
-
 	public void printTableNestedDAG(PrintWriter out) {
-		NestedDAG nestedDAG = collapsedDag;
+		NestedDAG nestedDAG = overallCollapsedDag;
 		Map<Integer, List<HalfEdge>> edges = nestedDAG.getAllEdges();
 
 		IntSet nodes = new IntOpenHashSet();
-		String formatcol = "g.setNode(%d, {label: '%s',height:20});";
+		//String formatcol = "g.setNode(%d, {label: '%s',height:20});";
+		String formatcol = "%d=%s %s";
 		
-
 		edges.forEach((x, y) -> {
 			nodes.add(x.intValue());
 			y.forEach(z -> {
@@ -606,14 +648,14 @@ public class OutputGraphSession {
 			});
 		});
 
-		
 		for (int i : nodes) {
 			int xi = i / COL_MULTIPILER;
 			int xj = i % COL_MULTIPILER;
-			out.println(String.format(formatcol, i, tablenames.get(xi)));
+			out.println(String.format(formatcol, i, tablenames.get(xi),tableprop.get(xi) == null ? "NONVIEW" : "VIEW"));
 		}
 
-		String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
+		//String formatedge = "g.setEdge(%d, %d,{class:'z1-ed%d'});";
+		String formatedge = "%d - %d %d";
 		edges.forEach((x, y) -> {
 			y.forEach(z -> {
 				if (x / COL_MULTIPILER != z.getDest() / COL_MULTIPILER) {
@@ -622,8 +664,8 @@ public class OutputGraphSession {
 			});
 		});
 
-	}	
-	
+	}
+
 	public int getLastTableid() {
 		return lastTableid;
 	}

@@ -3,7 +3,7 @@ package io.github.jhg543.mellex.util;
 public class HalfEdge {
 	private int dest;
 	private int type;
-	private int statementid;
+	private int marker;
 
 	public int getDest() {
 		return dest;
@@ -13,15 +13,15 @@ public class HalfEdge {
 		return type;
 	}
 
-	public int getStatementid() {
-		return statementid;
+	public int getMarker() {
+		return marker;
 	}
 
-	public HalfEdge(int dest, int type, int statementid) {
+	public HalfEdge(int dest, int type, int marker) {
 		super();
 		this.dest = dest;
 		this.type = type;
-		this.statementid = statementid;
+		this.marker = marker;
 	}
 
 	public static int TYPE_DIRECT = 0;
@@ -32,7 +32,7 @@ public class HalfEdge {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + dest;
-		result = prime * result + statementid;
+		result = prime * result + marker;
 		result = prime * result + type;
 		return result;
 	}
@@ -48,7 +48,7 @@ public class HalfEdge {
 		HalfEdge other = (HalfEdge) obj;
 		if (dest != other.dest)
 			return false;
-		if (statementid != other.statementid)
+		if (marker != other.marker)
 			return false;
 		if (type != other.type)
 			return false;

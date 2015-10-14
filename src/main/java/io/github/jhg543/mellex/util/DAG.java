@@ -1,6 +1,7 @@
 package io.github.jhg543.mellex.util;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -103,6 +104,14 @@ public class DAG {
 
 	}
 
+	public Int2ObjectMap<Node> listAllEdges() {
+		Int2ObjectMap<Node> result = new Int2ObjectOpenHashMap<Node>();
+		for (Entry<Node_internal> entry : edges.int2ObjectEntrySet()) {
+			result.put(entry.getIntKey(), entry.getValue());
+		}
+		return result;
+	}
+
 	// public IntList listInboundEdges(int node) {
 	// Node n = edges.get(node);
 	// if (n == null) {
@@ -122,7 +131,7 @@ public class DAG {
 		// return null;
 	}
 
-	public Int2ObjectMap<Node> collapse(int stmtid) {
+	public Int2ObjectMap<Node> collapse(int collapsedEdgeid) {
 		Int2ObjectMap<Node> result = new Int2ObjectOpenHashMap<Node>();
 
 		edges.int2ObjectEntrySet().forEach(x -> {
@@ -135,7 +144,7 @@ public class DAG {
 				edges.int2ObjectEntrySet().forEach(y -> {
 					Node_internal dest = y.getValue();
 					if (!x.equals(y) && dest.isperm && dest.visit != -1) {
-						newone.out.add(new HalfEdge(y.getIntKey(), dest.visit, stmtid));
+						newone.out.add(new HalfEdge(y.getIntKey(), dest.visit, collapsedEdgeid));
 					}
 				});
 				if (newone.out.size() > 0) {

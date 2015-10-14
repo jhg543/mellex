@@ -8,11 +8,13 @@ import java.util.Map;
 public interface TableDefinitionProvider {
 
 	public abstract CreateTableStmt queryTable(ObjectName name2);
+	
+	public abstract CreateTableStmt queryTable(String name);
 
 	public abstract void putTable(CreateTableStmt stmt, boolean isvolatile);
 
-	public abstract Map<ObjectName, CreateTableStmt> getVolatileTables();
+	public abstract Map<String, CreateTableStmt> getVolatileTables();
 
-	public abstract void clearinternal();
+	public abstract void clearVolatileTables();
 
 }

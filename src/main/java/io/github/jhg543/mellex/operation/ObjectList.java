@@ -102,10 +102,10 @@ public class ObjectList {
 
 			ColumnDataFlowListener s = new ColumnDataFlowListener(provider,tokens);
 			w.walk(s, tree);
-			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x.toDotString()));
+			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x));
 			PrintListener p = new PrintListener(out, tokens, outsession);
 			w.walk(p, tree);
-			provider.clearinternal();
+			provider.clearVolatileTables();
 		} catch (Exception e) {
 			errors.accept(e);
 		}
@@ -137,8 +137,8 @@ public class ObjectList {
 
 			TableDataFlowListener s = new TableDataFlowListener(provider,tokens,outsession);
 			w.walk(s, tree);
-			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x.toDotString()));
-			provider.clearinternal();
+			provider.getVolatileTables().keySet().stream().forEach(x -> outsession.putVolatileTable(x));
+			provider.clearVolatileTables();
 		} catch (Exception e) {
 			errors.accept(e);
 		}

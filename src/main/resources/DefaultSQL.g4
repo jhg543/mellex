@@ -154,7 +154,7 @@ attach_stmt
  ;
 
 begin_stmt
- : K_BEGIN ( K_DEFERRED | K_IMMEDIATE | K_EXCLUSIVE )? ( K_TRANSACTION transaction_name? )?
+ : K_BEGIN ( K_DEFERRED | K_IMMEDIATE | K_EXCLUSIVE )? ( K_TRANSACTION transaction_name? | any_name )?
  ;
 
 commit_stmt
@@ -900,6 +900,7 @@ keyword
  | K_HOUR
  | K_SECOND
  | K_SAMPLE
+ | K_INTERVAL
  ;
 
 // TODO check all names below

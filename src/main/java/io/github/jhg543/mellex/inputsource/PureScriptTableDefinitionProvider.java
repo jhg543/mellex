@@ -9,10 +9,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Deprecated
 public class PureScriptTableDefinitionProvider implements TableDefinitionProvider {
 
 	Map<ObjectName, CreateTableStmt> permanenttable = new ConcurrentHashMap<>();
@@ -143,8 +145,10 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 	 * ()
 	 */
 	@Override
-	public Map<ObjectName, CreateTableStmt> getVolatileTables() {
-		return Collections.unmodifiableMap(volatiletable);
+	public Map<String, CreateTableStmt> getVolatileTables() {
+		Map<String, CreateTableStmt> result = volatiletable.entrySet().stream()
+				.collect(Collectors.toMap(x -> x.getKey().toDotString(), x -> x.getValue()));
+		return result;
 	}
 
 	/*
@@ -155,7 +159,12 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 	 * ()
 	 */
 	@Override
-	public void clearinternal() {
+	public void clearVolatileTables() {
 		volatiletable.clear();
+	}
+
+	@Override
+	public CreateTableStmt queryTable(String name) {
+		return queryTable(ObjectName.fromString(name));
 	}
 }

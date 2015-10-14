@@ -101,6 +101,7 @@ public class TableDataFlowListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitCreate_view_stmt(Create_view_stmtContext ctx) {
 		CreateTableStmt stmt = new CreateTableStmt();
+		stmt.setViewDef(stmt);
 		ctx.stmt = stmt;
 		stmt.dbobj = ctx.obj.objname;
 

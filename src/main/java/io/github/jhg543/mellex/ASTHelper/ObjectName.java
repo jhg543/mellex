@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 
 public class ObjectName {
 	// TODO remove Global settings here
@@ -36,6 +37,31 @@ public class ObjectName {
 
 	public String toDotString() {
 		return Joiner.on('.').join(ns.toArray());
+	}
+
+	public String toDotStringExceptLast() {
+		if (ns.size() == 2) {
+			return ns.get(0);
+		}
+		if (ns.size() == 1) {
+			return null;
+		}
+		StringBuilder b = new StringBuilder(ns.get(0));
+		for (int i = 1; i < ns.size(); ++i) {
+			b.append('.');
+			b.append(ns.get(i));
+		}
+		return b.toString();
+	}
+	
+	public String toDotStringLast() {
+		return ns.get(ns.size()-1);
+	}
+
+	public static ObjectName fromString(String name) {
+		ObjectName result = new ObjectName();
+		result.ns.addAll(Splitter.on('.').splitToList(name));
+		return result;
 	}
 
 	@Override
