@@ -47,7 +47,7 @@ public class ObjectName {
 			return null;
 		}
 		StringBuilder b = new StringBuilder(ns.get(0));
-		for (int i = 1; i < ns.size(); ++i) {
+		for (int i = 1; i < ns.size()-1; ++i) {
 			b.append('.');
 			b.append(ns.get(i));
 		}

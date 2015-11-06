@@ -78,6 +78,8 @@ public class DAG {
 	}
 
 	public void addEdge(int s, int e, int type, int stmtid) {
+		addEdge(s,new HalfEdge(e, type, stmtid));
+		/*
 		Node_internal sn = edges.get(s);
 		if (sn == null) {
 			sn = new Node_internal();
@@ -91,7 +93,7 @@ public class DAG {
 			edges.put(e, en);
 		}
 		en.in.add(s);
-
+		*/
 	}
 
 	public List<HalfEdge> listOutEdges(int node) {
