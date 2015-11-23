@@ -26,8 +26,11 @@ import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -38,6 +41,9 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 
 public class StringEdgePrinter {
 	private static final Logger log = LoggerFactory.getLogger(StringEdgePrinter.class);
@@ -214,12 +220,24 @@ public class StringEdgePrinter {
 
 			Int2ObjectMap<Node> collapsed = dag.collapse(scriptNumber);
 			try (PrintWriter out = new PrintWriter(dstdir.resolve("novt").toAbsolutePath().toString(), "utf-8")) {
-				out.println("ScriptID StmtID StmtType DestCol SrcCol ConnectionType");
-				String template = "%d %d %s %s %s %d\n";
+				out.println("scriptid,dstsch,dsttbl,dstcol,srcsch,srctbl,srccol,contype");
+				String template = "%d,%s,%s,%s,%s,%s,%s,%d\n";
 				for (Entry<Node> et : collapsed.int2ObjectEntrySet()) {
 					for (HalfEdge hf : et.getValue().getOutEdges()) {
-						out.append(String.format(template, scriptNumber, 0, 0, ids.queryString(hf.getDest()),
-								ids.queryString(et.getKey()), hf.getType()));
+						String dst = ids.queryString(hf.getDest());
+						String src = ids.queryString(et.getKey());
+						List<String> t1 = Splitter.on('.').splitToList(dst);
+						if (t1.size()==2){
+							t1 = new ArrayList<String>(t1);
+							t1.add(0, "3X_NOSCHEMA_"+scriptNumber);
+						}
+						List<String> t2 = Splitter.on('.').splitToList(src);
+						if (t2.size()==2){
+							t2 = new ArrayList<String>(t1);
+							t2.add(0, "3X_NOSCHEMA_"+scriptNumber);
+						}
+						out.append(String.format(template, scriptNumber, t1.get(0),t1.get(1),t1.get(2),t2.get(0),t2.get(1),t2.get(2)
+								, hf.getType()));
 					}
 				}
 			}
@@ -232,33 +250,40 @@ public class StringEdgePrinter {
 		}
 	}
 
-	public static int[] printStringEdge(Path srcdir, Path dstdir, int scriptNumberStart, boolean caseSensitive) {
-
+	public static int[] printStringEdge(Path srcdir, Path dstdir, Predicate<Path> filefilter, int scriptNumberStart,
+			boolean caseSensitive) {
+		Preconditions.checkState(Files.isDirectory(srcdir));
+		try {
+			Files.createDirectories(dstdir);
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
 		GlobalSettings.setCaseSensitive(caseSensitive);
 		AtomicInteger scriptNumber = new AtomicInteger(scriptNumberStart);
 		TableDefinitionProvider tp = new BasicTableDefinitionProvider(Misc::nameSym);
 		int[] stats = new int[10];
-		try (PrintWriter out = new PrintWriter(dstdir.resolve("stats").toAbsolutePath().toString(), "utf-8")) {
-			Files.walk(srcdir)
-					.filter(x -> Files.isRegularFile(x)
-							&& (x.getFileName().toString().toLowerCase().endsWith(".sql") || x.getFileName().toString()
-									.toLowerCase().endsWith(".pl"))
-							&& x.toString().toUpperCase().endsWith("BIN\\" + x.getFileName().toString().toUpperCase()))
-					.sorted().forEach(path -> {
-						int sn = scriptNumber.getAndIncrement();
-						String srcHash = Integer.toHexString(path.hashCode());
-						Path workdir = dstdir.resolve(path.getFileName()).resolve(srcHash);
-						int retcode = printSingleFile(path, workdir, sn, tp);
-						if (retcode > 0) {
-							out.println(String.format("%s %d %d", path.toString(), retcode, sn));
-						}
-						stats[retcode]++;
-					});
+		try (PrintWriter out = new PrintWriter(dstdir.resolve("stats").toAbsolutePath().toString(), "utf-8");
+				PrintWriter cols=new PrintWriter(dstdir.resolve("cols").toAbsolutePath().toString(), "utf-8");
+				PrintWriter numbers=new PrintWriter(dstdir.resolve("number").toAbsolutePath().toString(), "utf-8");) {
+			Files.walk(srcdir).filter(filefilter).sorted().forEach(path -> {
+				int sn = scriptNumber.getAndIncrement();
+				numbers.println(""+sn+" "+path.toString());
+				String srcHash = Integer.toHexString(path.hashCode());
+				Path workdir = dstdir.resolve(path.getFileName()).resolve(srcHash);
+				int retcode = printSingleFile(path, workdir, sn, tp);
+				if (retcode > 0) {
+					out.println(String.format("%s %d %d", path.toString(), retcode, sn));
+				}
+				stats[retcode]++;
+			});
 
 			out.println("OK=" + stats[ERR_OK]);
 			out.println("NOSQL=" + stats[ERR_NOSQL]);
 			out.println("PARSE=" + stats[ERR_PARSE]);
 			out.println("SEMANTIC=" + stats[ERR_SEMANTIC]);
+			tp.getPermanentTables().forEach((name,stmt)->{
+				stmt.columns.forEach(colname->cols.println(name+"."+colname.name));
+			});
 			return stats;
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -266,6 +291,11 @@ public class StringEdgePrinter {
 	}
 
 	public static void main(String[] args) throws Exception {
-		printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"), Paths.get("d:/dataflow/work2/res"), 0, false);
+		Predicate<Path> filefilter = x -> Files.isRegularFile(x)
+				&& (x.getFileName().toString().toLowerCase().endsWith(".sql") || x.getFileName().toString().toLowerCase()
+						.endsWith(".pl"))
+				&& x.toString().toUpperCase().endsWith("BIN\\" + x.getFileName().toString().toUpperCase());
+		//printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"), Paths.get("d:/dataflow/work2/mares"), filefilter, 0, false);
+		printStringEdge(Paths.get("d:/dataflow/work1/f1/presor"), Paths.get("d:/dataflow/work2/psorres"), filefilter, 0, false);
 	}
 }

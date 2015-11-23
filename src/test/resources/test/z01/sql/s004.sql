@@ -1,0 +1,67 @@
+
+
+--    .LOGON ${hostIp}/${user},${password};
+--    .WIDTH 256;
+    ----------------------------------------------------------------------------------------------------
+
+SET QUERY_BAND = 'APPL=ETL;SCRIPT=brg_card_01_a0300.pl;' FOR SESSION;
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+CREATE VOLATILE TABLE VT_NEW_DATA AS ${ADWDATANG}.BRG_CARD_01 WITH NO DATA ON COMMIT PRESERVE ROWS;
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+CREATE VOLATILE TABLE VT_CHG_DATA AS ${ADWDATANG}.BRG_CARD_01 WITH NO DATA ON COMMIT PRESERVE ROWS;
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+--每天全量数据插入临时表
+INSERT INTO VT_NEW_DATA
+SELECT
+    AR_KEYWRD                                                      --卡号
+   ,SUBSTR(CrdIsu_InsID,1,3)                       AS Splt_InsNo   --拆分机构号
+   ,CrdIsu_InsID                                   AS Orig_InsNo   --原始机构号
+   ,CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD') AS DATA_DATE    --数据业务日期
+FROM 
+   ${ADWDATANG}.DIM_M_DBCARD_AR_H
+WHERE 
+   StDt <= CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD')   
+   AND EdDt > CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD')
+   AND RCRD_DEL_DT >  CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD')
+;
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+--对比全量数据；找出新增、修改的数据插入临时表
+INSERT INTO VT_CHG_DATA
+SELECT 
+    AR_KEYWRD
+   ,Splt_InsNo
+   ,Orig_InsNo
+   ,CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD')
+FROM
+    VT_NEW_DATA
+MINUS
+SELECT 
+     AR_KEYWRD
+    ,Splt_InsNo
+    ,Orig_InsNo 
+    ,CAST('${TXNDATE}' AS DATE FORMAT 'YYYY-MM-DD')
+FROM 
+    ${ADWDATANG}.BRG_CARD_01;
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+BT;
+
+--按主键索引删除修改的数据后插入新增和修改的记录(新增和修改的记录数据业务日期为跑批日期)
+DELETE FROM ${ADWDATANG}.BRG_CARD_01 WHERE AR_KEYWRD IN (SELECT AR_KEYWRD FROM VT_CHG_DATA);
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+INSERT INTO ${ADWDATANG}.BRG_CARD_01 SELECT * FROM VT_CHG_DATA;  
+--.IF ERRORCODE <> 0 THEN .GOTO ERRORQUIT;
+
+ET;
+
+
+--    .LOGOFF;
+--    .QUIT 0;
+--    .LABEL ERRORQUIT;
+--    .IF ERRORCODE <> 0 THEN .QUIT 12;
+
+

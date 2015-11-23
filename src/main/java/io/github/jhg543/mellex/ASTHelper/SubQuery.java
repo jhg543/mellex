@@ -278,6 +278,7 @@ public class SubQuery {
 
 				} else {
 					log.error("Column" + name + "not found");
+					throw new RuntimeException("Column" + name + "not found");
 				}
 			} else {
 				rewriteResultColumn(n, rcalias);
@@ -293,6 +294,7 @@ public class SubQuery {
 
 				} else {
 					log.error("Column" + name + "not found");
+					throw new RuntimeException("Column" + name + "not found");
 				}
 			} else {
 				rewriteResultColumn(n, rcalias);

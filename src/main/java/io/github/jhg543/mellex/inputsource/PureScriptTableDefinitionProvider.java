@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,5 +167,10 @@ public class PureScriptTableDefinitionProvider implements TableDefinitionProvide
 	@Override
 	public CreateTableStmt queryTable(String name) {
 		return queryTable(ObjectName.fromString(name));
+	}
+
+	@Override
+	public Map<String, CreateTableStmt> getPermanentTables() {
+		throw new NotImplementedException("Not implemeted");
 	}
 }

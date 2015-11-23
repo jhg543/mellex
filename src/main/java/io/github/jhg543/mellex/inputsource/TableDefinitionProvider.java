@@ -14,6 +14,8 @@ public interface TableDefinitionProvider {
 	public abstract void putTable(CreateTableStmt stmt, boolean isvolatile);
 
 	public abstract Map<String, CreateTableStmt> getVolatileTables();
+	
+	public abstract Map<String, CreateTableStmt> getPermanentTables();
 
 	public abstract void clearVolatileTables();
 

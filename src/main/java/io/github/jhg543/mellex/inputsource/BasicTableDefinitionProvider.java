@@ -115,4 +115,9 @@ public class BasicTableDefinitionProvider implements TableDefinitionProvider {
 
 	}
 
+	@Override
+	public Map<String, CreateTableStmt> getPermanentTables() {
+		return Collections.unmodifiableMap(permanenttable);
+	}
+
 }
