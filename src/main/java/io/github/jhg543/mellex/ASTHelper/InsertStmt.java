@@ -12,16 +12,28 @@ public class InsertStmt extends SubQuery {
 		return true;
 	}
 
-	public void fromSubQuery(List<String> colnames, SubQuery q, List<Influences> exprs, ObjectName tablename) {
+	public void fromSubQuery(List<String> colnames, CreateTableStmt targetTable, SubQuery q, List<Influences> exprs,
+			ObjectName tablename) {
 
 		if (q != null) {
 			this.copyRC(q);
 			if (colnames.size() > 0) {
+				// from insert (col1,col2..)
 				if (colnames.size() != columns.size()) {
 					throw new RuntimeException("insert column count mismatch " + columns + colnames);
 				}
 				for (int i = 0; i < colnames.size(); ++i) {
 					columns.get(i).name = colnames.get(i);
+				}
+			} else {
+				// copy from table meta
+				if (targetTable.isInitialized()) {
+					if (targetTable.columns.size() != columns.size()) {
+						throw new RuntimeException("insert column count mismatch " + columns + colnames);
+					}
+					for (int i = 0; i < targetTable.columns.size(); ++i) {
+						columns.get(i).name = targetTable.columns.get(i).name;
+					}					
 				}
 			}
 		} else {

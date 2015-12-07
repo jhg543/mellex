@@ -21,6 +21,10 @@ public class SubQuery {
 	private String alias;
 	boolean initialized = true;
 
+	
+	/**
+	 * @return for createTableStmt false means no actual meta found.
+	 */
 	public boolean isInitialized() {
 		return initialized;
 	}

@@ -296,6 +296,6 @@ public class StringEdgePrinter {
 						.endsWith(".pl"))
 				&& x.toString().toUpperCase().endsWith("BIN\\" + x.getFileName().toString().toUpperCase());
 		//printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"), Paths.get("d:/dataflow/work2/mares"), filefilter, 0, false);
-		printStringEdge(Paths.get("d:/dataflow/work1/f1/presor"), Paths.get("d:/dataflow/work2/psorres"), filefilter, 0, false);
+		printStringEdge(Paths.get("d:/dataflow/work1/debug"), Paths.get("d:/dataflow/work2/debugres"), filefilter, 0, false);
 	}
 }

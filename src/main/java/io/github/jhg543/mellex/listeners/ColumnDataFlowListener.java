@@ -262,11 +262,16 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 				colnames.add(ctx.cn.get(i).getText().toUpperCase());
 			}
 		}
+		
+		CreateTableStmt targetTable = null;
+		if (colnames.size()==0){
+			targetTable = provider.queryTable(stmt.dbobj);
+		}
 		List<Influences> exprs = new ArrayList<>(ctx.ex.size());
 		for (int i = 0; i < ctx.ex.size(); ++i) {
 			exprs.add(ctx.ex.get(i).inf);
 		}
-		stmt.fromSubQuery(colnames, q, exprs, ctx.obj.objname);
+		stmt.fromSubQuery(colnames, targetTable, q, exprs, ctx.obj.objname);
 
 	}
 

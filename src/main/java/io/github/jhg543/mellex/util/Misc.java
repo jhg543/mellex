@@ -45,6 +45,20 @@ public class Misc {
 		}
 	}
 
+	public static String schemaSym(String name) {
+
+		if (name.charAt(0) == '$') {
+			if (name.charAt(1) == '{') {
+				return name;
+			} else {
+				return "${" + name.substring(1) + "}";
+			}
+		} else {
+			return "${" + name + "}";
+		}
+
+	}
+
 	public static boolean isvolatile(String name) {
 		List<String> n = Splitter.on('.').splitToList(name);
 		if (n != null && n.size() == 2) {
@@ -58,7 +72,7 @@ public class Misc {
 
 	public static String trimPerlScript(Path x) {
 		try {
-			//TODO detect encoding
+			// TODO detect encoding
 			String sqlscript = new String(Files.readAllBytes(x), Charset.forName("GBK"));
 			if (x.getFileName().toString().toLowerCase().endsWith(".sql")) {
 				return sqlscript;
