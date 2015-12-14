@@ -33,8 +33,16 @@ import com.google.common.collect.ImmutableList;
 
 public class CsvGraphReader {
 
-	private Map<String, VertexDBCol> mp;
-	DirectedGraph<VertexDBCol, EdgeETL> g;
+	private Map<String, VertexDBCol> vertexNames;
+	private DirectedGraph<VertexDBCol, EdgeETL> graph;
+
+	public Map<String, VertexDBCol> getVertexNames() {
+		return vertexNames;
+	}
+
+	public DirectedGraph<VertexDBCol, EdgeETL> getGraph() {
+		return graph;
+	}
 
 	private VertexDBCol getTableVertex(String s, String t, String c) {
 		s = s.intern();
@@ -45,30 +53,30 @@ public class CsvGraphReader {
 		fqnsb.append('.');
 		fqnsb.append(t);
 		String fqn = fqnsb.toString().intern();
-		VertexDBCol v = mp.get(fqn);
+		VertexDBCol v = vertexNames.get(fqn);
 		if (v == null) {
 			v = new VertexDBCol();
 			v.setColumn(t);
 			v.setTable(t);
 			v.setSchema(s);
 			v.setFqn(fqn);
-			mp.put(fqn, v);
-			g.addVertex(v);
+			vertexNames.put(fqn, v);
+			graph.addVertex(v);
 		}
 		return v;
 	}
 
 	public void readTableCsv(Path path) {
-		g = new DefaultDirectedGraph<VertexDBCol, EdgeETL>(EdgeETL.class);
-		mp = new HashMap<String, VertexDBCol>();
+		graph = new DefaultDirectedGraph<VertexDBCol, EdgeETL>(EdgeETL.class);
+		vertexNames = new HashMap<String, VertexDBCol>();
 		try {
 			Files.readAllLines(path).forEach(line -> {
 				List<String> linelist = Splitter.on(',').splitToList(line);
 				VertexDBCol end = getTableVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(2));
 				VertexDBCol start = getTableVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(5));
-				EdgeETL edge = g.getEdge(start, end);
+				EdgeETL edge = graph.getEdge(start, end);
 				if (edge == null) {
-					edge = g.addEdge(start, end);
+					edge = graph.addEdge(start, end);
 					edge.setScriptname("");
 				}
 				edge.setScriptname(linelist.get(0));
@@ -91,29 +99,29 @@ public class CsvGraphReader {
 		fqnsb.append('.');
 		fqnsb.append(c);
 		String fqn = fqnsb.toString().intern();
-		VertexDBCol v = mp.get(fqn);
+		VertexDBCol v = vertexNames.get(fqn);
 		if (v == null) {
 			v = new VertexDBCol();
 			v.setColumn(c);
 			v.setTable(t);
 			v.setSchema(s);
 			v.setFqn(fqn);
-			mp.put(fqn, v);
-			g.addVertex(v);
+			vertexNames.put(fqn, v);
+			graph.addVertex(v);
 		}
 		return v;
 	}
 
 	public void readCsv(Path path) {
 
-		g = new DirectedPseudograph<VertexDBCol, EdgeETL>(EdgeETL.class);
-		mp = new HashMap<String, VertexDBCol>();
+		graph = new DirectedPseudograph<VertexDBCol, EdgeETL>(EdgeETL.class);
+		vertexNames = new HashMap<String, VertexDBCol>();
 		try {
 			Files.readAllLines(path).forEach(line -> {
 				List<String> linelist = Splitter.on(',').splitToList(line);
 				VertexDBCol end = getVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(3));
 				VertexDBCol start = getVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(6));
-				EdgeETL edge = g.addEdge(start, end);
+				EdgeETL edge = graph.addEdge(start, end);
 				edge.setScriptname(linelist.get(0));
 				edge.setConntype(linelist.get(7));
 
@@ -123,7 +131,7 @@ public class CsvGraphReader {
 		}
 	}
 
-	public void outputEdges(List<EdgeETL> es, Path path) {
+	public static void outputEdges(List<EdgeETL> es, Path path) {
 		try (PrintWriter writer = new PrintWriter(path.toFile())) {
 
 			es.stream().forEach(y -> {
@@ -160,7 +168,7 @@ public class CsvGraphReader {
 			Path layoutoutputinversed = Paths.get("d:/manual_graph2.svg");
 			r.readTableCsv(src);
 			System.out.println("read complate");
-			List<VertexDBCol> vs = r.mp.values().stream().filter(x -> x.getTable().equals("T80_LIAB_CORP_ACCT_IDX_DD"))
+			List<VertexDBCol> vs = r.vertexNames.values().stream().filter(x -> x.getTable().equals("T80_LIAB_CORP_ACCT_IDX_DD"))
 					.collect(Collectors.toList());
 			Predicate<EdgeETL> test = x -> {
 				// System.out.println(x.getSource().getFqn());
@@ -169,7 +177,7 @@ public class CsvGraphReader {
 			};
 
 			System.out.println("find complate");
-			List<EdgeETL> es = LineageFinder.find(r.g, vs, test);
+			List<EdgeETL> es = LineageFinder.find(r.graph, vs, test);
 			r.outputEdges(es, filteredfile);
 			ProcessBuilder processbuilder = new ProcessBuilder(ImmutableList.of(layoutExecutable.toString(),
 					filteredfile.toString(), layoutoutput.toString(), "1000"));
@@ -225,7 +233,7 @@ public class CsvGraphReader {
 
 		SimRank ranker = new SimRank();
 		
-		ranker.convertG2(r.g);
+		ranker.convertG2(r.graph);
 		System.out.println(ranker.ec);
 		ranker.doiteration(1);
 		ranker.getSortedDvs().stream().filter(x->x.getA()!=x.getB()).limit(10).forEach(x->{

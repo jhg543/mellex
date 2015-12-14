@@ -1,5 +1,6 @@
 package io.github.jhg543.nyallas.graph;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -12,10 +13,10 @@ import com.google.common.base.Splitter;
 import com.google.common.io.Files;
 
 public class SVGInverter {
-	public static void invertSVG(Path source,Path target) throws Exception {
+	public static void invertSVG(Path source, Path target) {
 
-		String src = Files.toString(source.toFile(), StandardCharsets.UTF_8);
 		try (PrintWriter p = new PrintWriter(target.toFile())) {
+			String src = Files.toString(source.toFile(), StandardCharsets.UTF_8);
 			int i = 0;
 			int state = 0;
 			while (i < src.length()) {
@@ -119,6 +120,8 @@ public class SVGInverter {
 					break;
 				}
 			}
+		} catch (IOException e) {
+			throw new RuntimeException("error inverting svg", e);
 		} finally {
 		}
 	}
