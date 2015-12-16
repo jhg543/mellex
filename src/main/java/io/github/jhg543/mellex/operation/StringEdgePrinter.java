@@ -1,6 +1,7 @@
 package io.github.jhg543.mellex.operation;
 
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
+import io.github.jhg543.mellex.ASTHelper.InfSource;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
@@ -157,7 +158,8 @@ public class StringEdgePrinter {
 							}
 
 							for (ResultColumn c : q.columns) {
-								for (ObjectName srcname : c.inf.direct) {
+								for (InfSource source:c.inf.getSources()) {
+									ObjectName srcname  = source.getSourceObject();
 									String srcTable = srcname.toDotStringExceptLast();
 
 									boolean isSrcVT = vts.contains(srcTable);
@@ -165,14 +167,14 @@ public class StringEdgePrinter {
 										srcTable = "VT_" + srcHash + "_" + srcTable;
 									}
 									out.append(String.format(template, scriptNumber, stmtNumber, stmtType, dstTable, c.name,
-											srcTable, srcname.toDotStringLast(), 1));
+											srcTable, srcname.toDotStringLast(), source.getConnectionType().getMarker()));
 
 									// collapse volatile table
 									String dst = dstTable + "." + c.name;
 									String src = srcTable + "." + srcname.toDotStringLast();
 									Integer dstnum = ids.queryNumber(dst);
 									Integer srcnum = ids.queryNumber(src);
-									dag.addEdge(srcnum, dstnum, 1, stmtNumber);
+									dag.addEdge(srcnum, dstnum, source.getConnectionType().getMarker(), stmtNumber);
 									if (isDstVT) {
 										dag.setPerm(dstnum, false);
 									}
@@ -180,29 +182,6 @@ public class StringEdgePrinter {
 										dag.setPerm(srcnum, false);
 									}
 
-								}
-								for (ObjectName srcname : c.inf.indirect) {
-									String srcTable = srcname.toDotStringExceptLast();
-
-									boolean isSrcVT = vts.contains(srcTable);
-									if (isSrcVT) {
-										srcTable = "VT_" + srcHash + "_" + srcTable;
-									}
-									out.append(String.format(template, scriptNumber, stmtNumber, stmtType, dstTable, c.name,
-											srcTable, srcname.toDotStringLast(), 0));
-
-									// collapse volatile table
-									String dst = dstTable + "." + c.name;
-									String src = srcTable + "." + srcname.toDotStringLast();
-									Integer dstnum = ids.queryNumber(dst);
-									Integer srcnum = ids.queryNumber(src);
-									dag.addEdge(srcnum, dstnum, 0, stmtNumber);
-									if (isDstVT) {
-										dag.setPerm(dstnum, false);
-									}
-									if (isSrcVT) {
-										dag.setPerm(srcnum, false);
-									}
 								}
 
 							}
@@ -227,17 +206,17 @@ public class StringEdgePrinter {
 						String dst = ids.queryString(hf.getDest());
 						String src = ids.queryString(et.getKey());
 						List<String> t1 = Splitter.on('.').splitToList(dst);
-						if (t1.size()==2){
+						if (t1.size() == 2) {
 							t1 = new ArrayList<String>(t1);
-							t1.add(0, "3X_NOSCHEMA_"+scriptNumber);
+							t1.add(0, "3X_NOSCHEMA_" + scriptNumber);
 						}
 						List<String> t2 = Splitter.on('.').splitToList(src);
-						if (t2.size()==2){
+						if (t2.size() == 2) {
 							t2 = new ArrayList<String>(t1);
-							t2.add(0, "3X_NOSCHEMA_"+scriptNumber);
+							t2.add(0, "3X_NOSCHEMA_" + scriptNumber);
 						}
-						out.append(String.format(template, scriptNumber, t1.get(0),t1.get(1),t1.get(2),t2.get(0),t2.get(1),t2.get(2)
-								, hf.getType()));
+						out.append(String.format(template, scriptNumber, t1.get(0), t1.get(1), t1.get(2), t2.get(0), t2.get(1),
+								t2.get(2), hf.getType()));
 					}
 				}
 			}
@@ -263,11 +242,11 @@ public class StringEdgePrinter {
 		TableDefinitionProvider tp = new BasicTableDefinitionProvider(Misc::nameSym);
 		int[] stats = new int[10];
 		try (PrintWriter out = new PrintWriter(dstdir.resolve("stats").toAbsolutePath().toString(), "utf-8");
-				PrintWriter cols=new PrintWriter(dstdir.resolve("cols").toAbsolutePath().toString(), "utf-8");
-				PrintWriter numbers=new PrintWriter(dstdir.resolve("number").toAbsolutePath().toString(), "utf-8");) {
+				PrintWriter cols = new PrintWriter(dstdir.resolve("cols").toAbsolutePath().toString(), "utf-8");
+				PrintWriter numbers = new PrintWriter(dstdir.resolve("number").toAbsolutePath().toString(), "utf-8");) {
 			Files.walk(srcdir).filter(filefilter).sorted().forEach(path -> {
 				int sn = scriptNumber.getAndIncrement();
-				numbers.println(""+sn+" "+path.toString());
+				numbers.println("" + sn + " " + path.toString());
 				String srcHash = Integer.toHexString(path.hashCode());
 				Path workdir = dstdir.resolve(path.getFileName()).resolve(srcHash);
 				int retcode = printSingleFile(path, workdir, sn, tp);
@@ -281,8 +260,8 @@ public class StringEdgePrinter {
 			out.println("NOSQL=" + stats[ERR_NOSQL]);
 			out.println("PARSE=" + stats[ERR_PARSE]);
 			out.println("SEMANTIC=" + stats[ERR_SEMANTIC]);
-			tp.getPermanentTables().forEach((name,stmt)->{
-				stmt.columns.forEach(colname->cols.println(name+"."+colname.name));
+			tp.getPermanentTables().forEach((name, stmt) -> {
+				stmt.columns.forEach(colname -> cols.println(name + "." + colname.name));
 			});
 			return stats;
 		} catch (IOException e) {
@@ -295,7 +274,9 @@ public class StringEdgePrinter {
 				&& (x.getFileName().toString().toLowerCase().endsWith(".sql") || x.getFileName().toString().toLowerCase()
 						.endsWith(".pl"))
 				&& x.toString().toUpperCase().endsWith("BIN\\" + x.getFileName().toString().toUpperCase());
-		//printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"), Paths.get("d:/dataflow/work2/mares"), filefilter, 0, false);
-		printStringEdge(Paths.get("d:/dataflow/work1/debug"), Paths.get("d:/dataflow/work2/debugres"), filefilter, 0, false);
+		// printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"),
+		// Paths.get("d:/dataflow/work2/mares"), filefilter, 0, false);
+		//printStringEdge(Paths.get("d:/dataflow/work1/debug"), Paths.get("d:/dataflow/work2/debugres"), filefilter, 0, false);
+		printStringEdge(Paths.get("d:/dataflow/work1/f1/sor"), Paths.get("d:/dataflow/work2/result2/sor"), filefilter, 0, false);
 	}
 }

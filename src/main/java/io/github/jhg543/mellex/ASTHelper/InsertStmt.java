@@ -45,7 +45,7 @@ public class InsertStmt extends SubQuery {
 					Influences inf = exprs.get(i);
 					if (!inf.isempty()) {
 						ResultColumn c = new ResultColumn();
-						c.inf.copy(inf);
+						c.inf.addAll(inf);
 						c.name = colnames.get(i);
 						columns.add(c);
 					}
@@ -58,7 +58,7 @@ public class InsertStmt extends SubQuery {
 					Influences inf = exprs.get(i);
 					if (!inf.isempty()) {
 						ResultColumn c = new ResultColumn();
-						c.inf.copy(inf);
+						c.inf.addAll(inf);
 						c.name = "NO METADATA " + (i + 1);
 						c.position = i + 1;
 						columns.add(c);

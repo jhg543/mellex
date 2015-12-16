@@ -6,22 +6,31 @@ import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Not thread safe
+ * 
+ * @author zzz
+ *
+ */
 public class BasicTableDefinitionProvider implements TableDefinitionProvider {
 
-	Function<String, String> symprovider;
+	private Function<String, String> symprovider;
 
 	public BasicTableDefinitionProvider(Function<String, String> symprovider) {
 		this.symprovider = symprovider;
 	}
 
-	Map<String, CreateTableStmt> permanenttable = new ConcurrentHashMap<>();
-	Map<String, CreateTableStmt> volatiletable = new ConcurrentHashMap<>();
-	Map<String, CreateTableStmt> c = new ConcurrentHashMap<>();
+	private ConcurrentMap<String, AtomicInteger> notFoundCount = new ConcurrentHashMap<>();
+	private Map<String, CreateTableStmt> permanenttable = new ConcurrentHashMap<>();
+	private Map<String, CreateTableStmt> volatiletable = new ConcurrentHashMap<>();
+	private Map<String, CreateTableStmt> c = new ConcurrentHashMap<>();
 	private static final Logger log = LoggerFactory.getLogger(BasicTableDefinitionProvider.class);
 
 	/*
@@ -36,6 +45,10 @@ public class BasicTableDefinitionProvider implements TableDefinitionProvider {
 		return queryTable(name2.toDotString());
 	}
 
+	public Map<String, Integer> getNotFoundCount()
+	{
+		throw new RuntimeException("not implemented");
+	}
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -105,6 +118,7 @@ public class BasicTableDefinitionProvider implements TableDefinitionProvider {
 		if (result != null) {
 			return result;
 		} else {
+			countNotFound(normalizedName);
 			log.warn(normalizedName + " meta not found");
 			CreateTableStmt s = new CreateTableStmt();
 			s.dbobj = ObjectName.fromString(normalizedName);
@@ -113,6 +127,14 @@ public class BasicTableDefinitionProvider implements TableDefinitionProvider {
 			// throw new RuntimeException(name + "meta not found");
 		}
 
+	}
+
+	private void countNotFound(String name) {
+		AtomicInteger newzero = new AtomicInteger(1);
+		AtomicInteger pv = notFoundCount.putIfAbsent(name, newzero);
+		if (pv != null) {
+			pv.incrementAndGet();
+		}
 	}
 
 	@Override

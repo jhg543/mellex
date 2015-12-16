@@ -16,7 +16,7 @@ public class CreateTableStmt extends SubQuery  {
 	public SubQuery getViewDef() {
 		return viewDef;
 	}
-
+	
 	public void setViewDef(SubQuery viewDef) {
 		this.viewDef = viewDef;
 	}

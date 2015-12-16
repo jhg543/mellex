@@ -1,6 +1,7 @@
 package io.github.jhg543.mellex.session;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
+import io.github.jhg543.mellex.ASTHelper.InfSource;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
@@ -266,23 +267,12 @@ public class OutputGraphSession {
 		Set<Integer> cis = new HashSet<Integer>();
 
 		for (int i = 0; i < q.columns.size(); ++i) {
-			List<ObjectName> infs = q.columns.get(i).inf.indirect;
-			List<ObjectName> dnfs = q.columns.get(i).inf.direct;
-			outColids[i] = new Integer[infs.size() + dnfs.size()];
-			for (int j = 0; j < infs.size(); ++j) {
-				ObjectName name = infs.get(j);
+			List<InfSource> ss = q.columns.get(i).inf.getSources();
+			outColids[i] = new Integer[ss.size()];
+			for (int j = 0; j < ss.size(); ++j) {
+				ObjectName name = ss.get(j).getSourceObject();
 				int cid = resolveCol(name);
 				outColids[i][j] = cid;
-				int t = cid / COL_MULTIPILER;
-				if (!groupedges.get(leftTableid).contains(t)) {
-					groupedges.get(leftTableid).add(t);
-				}
-			}
-
-			for (int j = 0; j < dnfs.size(); ++j) {
-				ObjectName name = dnfs.get(j);
-				int cid = resolveCol(name);
-				outColids[i][j + infs.size()] = cid;
 				int t = cid / COL_MULTIPILER;
 				if (!groupedges.get(leftTableid).contains(t)) {
 					groupedges.get(leftTableid).add(t);
@@ -313,26 +303,17 @@ public class OutputGraphSession {
 
 			}
 			Integer leftid = leftTableid * COL_MULTIPILER + leftcolid;
+			List<InfSource> ss = c.inf.getSources();
 
-			int indirectlen = c.inf.indirect.size();
-
-			for (int j = indirectlen; j < outColids[i].length; ++j) {
+			for (int j = 0; j < outColids[i].length; ++j) {
 				int cid = outColids[i][j];
-				currentSessionDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
+				currentSessionDag.addEdge(leftid, cid, ss.get(j).getConnectionType().getMarker(), stmtid);
 				if (!cis.contains(cid)) {
-					overallDag.addEdge(leftid, cid, HalfEdge.TYPE_DIRECT, stmtid);
+					overallDag.addEdge(leftid, cid, ss.get(j).getConnectionType().getMarker(), stmtid);
 				}
 
 			}
-			for (int j = 0; j < indirectlen; ++j) {
-				int cid = outColids[i][j];
-				currentSessionDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
-
-				if (!cis.contains(cid)) {
-					overallDag.addEdge(leftid, cid, HalfEdge.TYPE_INDIRECT, stmtid);
-				}
-
-			}
+			
 
 		}
 	}

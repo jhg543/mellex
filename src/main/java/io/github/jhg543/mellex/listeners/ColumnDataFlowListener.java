@@ -101,7 +101,8 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		ObjectName name = ctx.obj.objname;
 		stmt.dbobj = name;
 		if (ctx.st != null) {
-			SubQuery q = ctx.st.q;
+			// has source table
+			SubQuery sourceTable = ctx.st.q;
 			if (ctx.def != null) {
 				for (String colname : ctx.def.colnames) {
 					ObjectName cn = new ObjectName();
@@ -109,41 +110,42 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 					cn.ns.add(colname);
 					ResultColumn c = new ResultColumn();
 					c.name = colname;
-					c.inf.direct.add(cn);
+					c.inf.addInResultExpression(cn);
 					stmt.columns.add(c);
 				}
 
 			} else {
-				for (ResultColumn oc : q.columns) {
+				for (ResultColumn oc : sourceTable.columns) {
 					String colname = oc.name;
 					ObjectName cn = new ObjectName();
 					cn.ns.addAll(name.ns);
 					cn.ns.add(colname);
 					ResultColumn c = new ResultColumn();
 					c.name = colname;
-					c.inf.direct.add(cn);
+					c.inf.addInResultExpression(cn);
 					stmt.columns.add(c);
 				}
 			}
 
 			if (!(ctx.st.nodata)) {
+			// will copy source table data	
 				InsertStmt ins = new InsertStmt();
-				ins.copyRC(stmt);
+				ins.copyResultColumnNames(stmt);
 				for (int i = 0; i < ins.columns.size(); ++i) {
 					ResultColumn c = ins.columns.get(i);
-					c.inf.direct.clear();
-					if (q.columns == null) {
+					
+					if (sourceTable.columns == null) {
 						ObjectName n = new ObjectName();
-						n.ns.addAll(q.dbobj.ns);
+						n.ns.addAll(sourceTable.dbobj.ns);
 						n.ns.add(c.name);
-						c.inf.direct.add(n);
+						c.inf.addInResultExpression(n);
 					} else {
 						// ResultColumn tc = q.searchcol(c.name); WTF TD 532
-						ResultColumn tc = q.columns.get(i);
+						ResultColumn tc = sourceTable.columns.get(i);
 						if (tc == null) {
 							throw new RuntimeException("col not found " + c.name);
 						}
-						c.inf.copy(tc.inf);
+						c.inf.addAll(tc.inf);
 					}
 				}
 				ins.dbobj = stmt.dbobj;
@@ -157,7 +159,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 				cn.ns.add(colname);
 				ResultColumn c = new ResultColumn();
 				c.name = colname;
-				c.inf.direct.add(cn);
+				c.inf.addInResultExpression(cn);
 				stmt.columns.add(c);
 			}
 		}
@@ -210,6 +212,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 			throw new RuntimeException("column size mismatch " + ctx.obj.objname);
 		}
 
+		// write column names
 		for (int i = 0; i < q.columns.size(); ++i) {
 			String colname;
 			if (ctx.cn.size() > 0) {
@@ -222,16 +225,16 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 			coln.ns.add(colname);
 			ResultColumn c = new ResultColumn();
 			c.name = colname;
-			c.inf.direct.add(coln);
+			c.inf.addInResultExpression(coln);
 			stmt.columns.add(c);
 		}
 
+		// mark data source
 		InsertStmt ins = new InsertStmt();
-		ins.copyRC(stmt);
+		ins.copyResultColumnNames(stmt);
 		for (int i = 0; i < ins.columns.size(); ++i) {
 			ResultColumn c = ins.columns.get(i);
-			c.inf.direct.clear();
-			c.inf.copy(q.columns.get(i).inf);
+			c.inf.addAll(q.columns.get(i).inf);
 
 		}
 		ctx.insert = ins;
@@ -310,6 +313,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		List<SubQuery> tables = new ArrayList<>();
 		SubQuery targetTable = new SubQuery();
 
+		// deal with "UPDATE A1 from REAL_TABLE_NAME a1,SOME_TABLE NAME a2, rewrite targettable.dbobj from A1 to REAL_TABLE_NAME
 		if (ctx.tobj.objname.ns.size() == 1 && ctx.f != null) {
 			String n = ctx.tobj.objname.ns.get(0);
 			for (SubQuery query : ctx.f.tables) {
@@ -337,7 +341,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		}
 
 		if (ctx.wex != null) {
-			q.ci.copypoi(ctx.wex.inf);
+			q.ci.addAllInClause(ctx.wex.inf);
 		}
 
 		q.columns = ctx.s.columns;
@@ -363,7 +367,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		for (int i = 0; i < ctx.cn.size(); ++i) {
 			ResultColumn c = new ResultColumn();
 			c.name = ctx.cn.get(i).getText();
-			c.inf.copy(ctx.ex.get(i).inf);
+			c.inf.addAll(ctx.ex.get(i).inf);
 			columns.add(c);
 		}
 	}
@@ -372,10 +376,10 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitExprCase(ExprCaseContext ctx) {
 		Influences cinf = new Influences();
 		for (ExprContext param : ctx.ex) {
-			cinf.copypoi(param.inf);
+			cinf.addAllInClause(param.inf);
 		}
 		for (ExprContext param : ctx.ax) {
-			cinf.copy(param.inf);
+			cinf.addAll(param.inf);
 		}
 		ctx.inf = cinf;
 	}
@@ -384,10 +388,10 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitExprFunction(ExprFunctionContext ctx) {
 		Influences cinf = new Influences();
 		for (ExprContext param : ctx.ex) {
-			cinf.copy(param.inf);
+			cinf.addAll(param.inf);
 		}
 		if (ctx.wx != null) {
-			cinf.copypoi(ctx.wx.inf);
+			cinf.addAllInClause(ctx.wx.inf);
 		}
 		ctx.inf = cinf;
 	}
@@ -396,9 +400,9 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitExprExists(ExprExistsContext ctx) {
 		Influences cinf = new Influences();
 		if (ctx.isexists != null) {
-			cinf.copypoiselect(ctx.ss.q);
+			cinf.copySelectStmtAsClause(ctx.ss.q);
 		} else {
-			cinf.copyselect(ctx.ss.q);
+			cinf.copySelectScalar(ctx.ss.q);
 		}
 		ctx.inf = cinf;
 	}
@@ -406,14 +410,14 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
 		Influences cinf = new Influences();
-		cinf.copy(ctx.sp.inf);
+		cinf.addAll(ctx.sp.inf);
 		ctx.inf = cinf;
 	}
 
 	@Override
 	public void exitExprObject(ExprObjectContext ctx) {
 		Influences cinf = new Influences();
-		cinf.direct.add(ctx.obj.objname);
+		cinf.addInResultExpression(ctx.obj.objname);
 		ctx.objname = ctx.obj.objname;
 		ctx.inf = cinf;
 	}
@@ -421,8 +425,8 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitExpr2(Expr2Context ctx) {
 		Influences cinf = new Influences();
-		cinf.copy(ctx.operand1.inf);
-		cinf.copy(ctx.operand2.inf);
+		cinf.addAll(ctx.operand1.inf);
+		cinf.addAll(ctx.operand2.inf);
 		ctx.inf = cinf;
 	}
 
@@ -430,7 +434,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitExpr1(Expr1Context ctx) {
 		Influences cinf = new Influences();
 		ctx.inf = cinf;
-		cinf.copy(ctx.operand1.inf);
+		cinf.addAll(ctx.operand1.inf);
 
 	}
 
@@ -443,34 +447,34 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitExpr2poi(Expr2poiContext ctx) {
 		Influences cinf = new Influences();
-		cinf.copypoi(ctx.operand1.inf);
-		cinf.copypoi(ctx.operand2.inf);
+		cinf.addAllInClause(ctx.operand1.inf);
+		cinf.addAllInClause(ctx.operand2.inf);
 		ctx.inf = cinf;
 	}
 
 	@Override
 	public void exitExprBetween(ExprBetweenContext ctx) {
 		Influences cinf = new Influences();
-		cinf.copypoi(ctx.operand1.inf);
-		cinf.copypoi(ctx.operand2.inf);
-		cinf.copypoi(ctx.operand3.inf);
+		cinf.addAllInClause(ctx.operand1.inf);
+		cinf.addAllInClause(ctx.operand2.inf);
+		cinf.addAllInClause(ctx.operand3.inf);
 		ctx.inf = cinf;
 	}
 
 	@Override
 	public void exitSpecial_function1(Special_function1Context ctx) {
 		Influences cinf = new Influences();
-		cinf.copy(ctx.operand1.inf);
+		cinf.addAll(ctx.operand1.inf);
 		ctx.inf = cinf;
 	}
 
 	@Override
 	public void exitSpecial_functionSubString(Special_functionSubStringContext ctx) {
 		Influences cinf = new Influences();
-		cinf.copy(ctx.operand1.inf);
-		cinf.copypoi(ctx.operand2.inf);
+		cinf.addAll(ctx.operand1.inf);
+		cinf.addAllInClause(ctx.operand2.inf);
 		if (ctx.operand3 != null) {
-			cinf.copypoi(ctx.operand3.inf);
+			cinf.addAllInClause(ctx.operand3.inf);
 		}
 		ctx.inf = cinf;
 	}
@@ -493,7 +497,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	@Override
 	public void exitOrdering_term_window(Ordering_term_windowContext ctx) {
 		Influences cinf = new Influences();
-		cinf.copypoi(ctx.operand1.inf);
+		cinf.addAllInClause(ctx.operand1.inf);
 		ctx.inf = cinf;
 	}
 
@@ -528,21 +532,22 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
 		ResultColumn rc = new ResultColumn();
 		rc.name = ctx.tn.getText() + ".*";
-		rc.isObjectName = true;
+		rc.setObjectName(true);
 		ctx.rc = rc;
 	}
 
 	@Override
 	public void exitResult_columnExpr(Result_columnExprContext ctx) {
 		ResultColumn rc = new ResultColumn();
-		rc.inf.copy(ctx.ex.inf);
+		rc.inf.addAll(ctx.ex.inf);
+		if (ctx.ex.objname != null) {
+			rc.setObjectName(true);
+		}
 		if (ctx.ca != null) {
 			rc.name = ctx.ca.getText();
 			rc.hasAlias = true;
 		} else {
-			if (ctx.ex.objname != null) {
-				rc.isObjectName = true;
-			}
+
 			rc.name = ctx.ex.getText();
 
 		}
@@ -603,7 +608,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		}
 
 		for (ExprContext expr : ctx.ex) {
-			join_constraints.copypoi(expr.inf);
+			join_constraints.addAllInClause(expr.inf);
 		}
 
 	}
@@ -620,7 +625,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		// join
 		if (ctx.jc != null) {
-			q.ci.copypoi(ctx.jc.join_constraints);
+			q.ci.addAllInClause(ctx.jc.join_constraints);
 			tables = ctx.jc.tables;
 		} else {
 			tables = new ArrayList<SubQuery>();
@@ -628,33 +633,33 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		// group by
 		if (ctx.g1 != null) {
-			q.ci.copypoi(ctx.g1.inf);
+			q.ci.addAllInClause(ctx.g1.inf);
 			groupbypositions.addAll(ctx.g1.positions);
 		}
 
 		if (ctx.g2 != null) {
-			q.ci.copypoi(ctx.g2.inf);
+			q.ci.addAllInClause(ctx.g2.inf);
 			groupbypositions.addAll(ctx.g2.positions);
 		}
 
 		// where
 		if (ctx.w1 != null) {
-			q.ci.copypoi(ctx.w1.inf);
+			q.ci.addAllInClause(ctx.w1.inf);
 		}
 
 		// having
 		if (ctx.h1 != null) {
-			q.ci.copypoi(ctx.h1.inf);
+			q.ci.addAllInClause(ctx.h1.inf);
 		}
 
 		// qualify
 		if (ctx.q1 != null) {
-			q.ci.copypoi(ctx.q1.inf);
+			q.ci.addAllInClause(ctx.q1.inf);
 		}
 
 		// order by
 		if (ctx.o1 != null) {
-			q.ci.copypoi(ctx.o1.inf);
+			q.ci.addAllInClause(ctx.o1.inf);
 			groupbypositions.addAll(ctx.o1.positions);
 		}
 
@@ -670,7 +675,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		ctx.inf = inf;
 		ctx.positions = positions;
 		for (int i = 0; i < ctx.ex.size(); ++i) {
-			inf.copypoi(ctx.ex.get(i).inf);
+			inf.addAllInClause(ctx.ex.get(i).inf);
 		}
 		for (int i = 0; i < ctx.nx.size(); ++i) {
 			positions.add(Integer.valueOf(ctx.nx.get(i).getText()));
@@ -681,7 +686,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitWhere_clause(Where_clauseContext ctx) {
 		Influences inf = new Influences();
 		ctx.inf = inf;
-		inf.copypoi(ctx.ex.inf);
+		inf.addAllInClause(ctx.ex.inf);
 	}
 
 	@Override
@@ -691,7 +696,7 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		ctx.inf = inf;
 		ctx.positions = positions;
 		for (int i = 0; i < ctx.ex.size(); ++i) {
-			inf.copypoi(ctx.ex.get(i).inf);
+			inf.addAllInClause(ctx.ex.get(i).inf);
 		}
 		for (int i = 0; i < ctx.nx.size(); ++i) {
 			positions.add(Integer.valueOf(ctx.nx.get(i).getText()));
@@ -702,14 +707,14 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 	public void exitHaving_clause(Having_clauseContext ctx) {
 		Influences inf = new Influences();
 		ctx.inf = inf;
-		inf.copypoi(ctx.ex.inf);
+		inf.addAllInClause(ctx.ex.inf);
 	}
 
 	@Override
 	public void exitQualify_clause(Qualify_clauseContext ctx) {
 		Influences inf = new Influences();
 		ctx.inf = inf;
-		inf.copypoi(ctx.ex.inf);
+		inf.addAllInClause(ctx.ex.inf);
 	}
 
 	@Override
@@ -717,10 +722,10 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 		Influences inf = new Influences();
 		ctx.inf = inf;
 		for (int i = 0; i < ctx.ex.size(); ++i) {
-			inf.copypoi(ctx.ex.get(i).inf);
+			inf.addAllInClause(ctx.ex.get(i).inf);
 		}
 		for (int i = 0; i < ctx.ox.size(); ++i) {
-			inf.copypoi(ctx.ox.get(i).inf);
+			inf.addAllInClause(ctx.ox.get(i).inf);
 		}
 
 	}

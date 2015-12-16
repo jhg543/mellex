@@ -121,7 +121,7 @@ public class TableDependencyListener extends DefaultSQLBaseListener {
 	public void exitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
 		ResultColumn rc = new ResultColumn();
 		rc.name = ctx.tn.getText() + ".*";
-		rc.isObjectName = true;
+		rc.setObjectName(true);
 		ctx.rc = rc;
 	}
 
@@ -179,7 +179,7 @@ public class TableDependencyListener extends DefaultSQLBaseListener {
 						// no need to check dbobj is null ( "real" subquery wont have SubQuery object created )
 						session.mustConsumeTable(table.dbobj);
 					}
-				} else if (c.isObjectName) {
+				} else if (c.isObjectName()) {
 					// select p1.*
 					String tablename = c.name.substring(0, c.name.lastIndexOf('.'));
 					for (SubQuery table : tables) {

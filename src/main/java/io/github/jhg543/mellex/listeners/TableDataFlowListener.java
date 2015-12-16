@@ -1,6 +1,8 @@
 package io.github.jhg543.mellex.listeners;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
+import io.github.jhg543.mellex.ASTHelper.InfConnection;
+import io.github.jhg543.mellex.ASTHelper.InfSource;
 import io.github.jhg543.mellex.ASTHelper.InsertStmt;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
@@ -74,14 +76,13 @@ public class TableDataFlowListener extends DefaultSQLBaseListener {
 
 		ResultColumn c = new ResultColumn();
 		c.name = "A";
-		c.inf.direct.addAll(p1);
+		p1.forEach(x -> c.inf.add(new InfSource(x, InfConnection.IN_RESULT_EXPRESSION)));
 		c.inf.unique();
-		c.inf.direct.remove(n);
+		c.inf.remove(new InfSource(n, InfConnection.IN_RESULT_EXPRESSION));
 		stmt.columns.add(c);
 
 		stmt.setVolatile(ctx.isvolatile);
-		if (ctx.isvolatile)
-		{
+		if (ctx.isvolatile) {
 			os.putVolatileTable(stmt.dbobj.toDotString());
 		}
 
@@ -111,11 +112,10 @@ public class TableDataFlowListener extends DefaultSQLBaseListener {
 
 		ResultColumn c = new ResultColumn();
 		c.name = "A";
-		c.inf.direct.addAll(p1);
+		p1.forEach(x -> c.inf.add(new InfSource(x, InfConnection.IN_RESULT_EXPRESSION)));
 		c.inf.unique();
-		c.inf.direct.remove(n);
+		c.inf.remove(new InfSource(n, InfConnection.IN_RESULT_EXPRESSION));
 		stmt.columns.add(c);
-
 
 		os.addFlow(stmt);
 	}
@@ -133,9 +133,9 @@ public class TableDataFlowListener extends DefaultSQLBaseListener {
 
 		ResultColumn c = new ResultColumn();
 		c.name = "A";
-		c.inf.direct.addAll(p1);
+		p1.forEach(x -> c.inf.add(new InfSource(x, InfConnection.IN_RESULT_EXPRESSION)));
 		c.inf.unique();
-		c.inf.direct.remove(n);
+		c.inf.remove(new InfSource(n, InfConnection.IN_RESULT_EXPRESSION));
 		stmt.columns.add(c);
 
 		os.addFlow(stmt);
@@ -182,9 +182,9 @@ public class TableDataFlowListener extends DefaultSQLBaseListener {
 
 		ResultColumn c = new ResultColumn();
 		c.name = "A";
-		c.inf.direct.addAll(p1);
+		p1.forEach(x -> c.inf.add(new InfSource(x, InfConnection.IN_RESULT_EXPRESSION)));
 		c.inf.unique();
-		c.inf.direct.remove(n);
+		c.inf.remove(new InfSource(n, InfConnection.IN_RESULT_EXPRESSION));
 
 		q.columns.add(c);
 

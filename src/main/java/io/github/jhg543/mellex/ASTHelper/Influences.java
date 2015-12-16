@@ -1,60 +1,89 @@
 package io.github.jhg543.mellex.ASTHelper;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Influences {
-	public List<ObjectName> direct = new ArrayList<ObjectName>();
-	public List<ObjectName> indirect = new ArrayList<ObjectName>();
 
-	public void copy(Influences other) {
-		direct.addAll(other.direct);
-		indirect.addAll(other.indirect);
+	private List<InfSource> sources = new ArrayList<InfSource>();
+
+	// private List<ObjectName> direct = new ArrayList<ObjectName>();
+	// private List<ObjectName> indirect = new ArrayList<ObjectName>();
+
+	public void addInResultExpression(ObjectName sourceObject) {
+		sources.add(new InfSource(sourceObject, InfConnection.IN_RESULT_EXPRESSION));
 	}
 
-	public void copypoi(Influences other) {
-		indirect.addAll(other.direct);
-		indirect.addAll(other.indirect);
+	public void addInClause(ObjectName sourceObject) {
+		sources.add(new InfSource(sourceObject, InfConnection.IN_CLAUSE));
 	}
 
-	public void copyselect(SubQuery other) {
-		copypoi(other.ci);
+	public void add(InfSource source) {
+		sources.add(source);
+	}
+	
+	public void remove(InfSource source) {
+		sources.remove(source);
+	}
+
+	public void addAll(Influences other) {
+		sources.addAll(other.sources);
+	}
+
+	public static Influences copyOf(Influences other) {
+		Influences i = new Influences();
+		i.addAll(other);
+		return i;
+	}
+
+	public List<InfSource> getSources() {
+		return Collections.unmodifiableList(sources);
+	}
+
+	public void addAllInClause(Influences other) {
+		InfSource expander = new InfSource(null, InfConnection.IN_CLAUSE);
+		sources.addAll(other.getSources().stream().map(expander::expand).collect(Collectors.toList()));
+	}
+
+	public void expand(Influences other, InfSource source) {
+		sources.addAll(other.getSources().stream().map(source::expand).collect(Collectors.toList()));
+	}
+
+	public void copySelectScalar(SubQuery other) {
+		addAllInClause(other.ci);
 		for (ResultColumn c : other.columns) {
-			copy(c.inf);
+			addAll(c.inf);
 		}
 		unique();
 	}
 
-	public void copypoiselect(SubQuery other) {
-		copypoi(other.ci);
+	public void copySelectStmtAsClause(SubQuery other) {
+		addAllInClause(other.ci);
 		for (ResultColumn c : other.columns) {
-			copypoi(c.inf);
+			addAllInClause(c.inf);
 		}
 		unique();
 	}
 
 	public static Influences ofdirect(ObjectName name) {
 		Influences inf = new Influences();
-		inf.direct.add(name);
+		InfSource e = new InfSource(name, InfConnection.IN_RESULT_EXPRESSION);
+		inf.sources.add(e);
 		return inf;
 	}
 
 	public void unique() {
-		Set<ObjectName> d1 = new HashSet<ObjectName>(direct);
-		Set<ObjectName> i1 = new HashSet<ObjectName>(indirect);
-		i1.removeAll(d1);
-		direct = new ArrayList<>(d1);
-		indirect = new ArrayList<>(i1);
+		sources = sources.stream().distinct().collect(Collectors.toCollection(ArrayList::new));
 	}
-	
+
 	public boolean isempty() {
-		return direct.size() + indirect.size() == 0;
+		return sources.size() == 0;
 	}
 
 	@Override
 	public String toString() {
-		return direct + ", " + indirect;
+		return sources.toString();
 	}
 }
