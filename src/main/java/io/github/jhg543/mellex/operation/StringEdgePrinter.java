@@ -17,6 +17,7 @@ import io.github.jhg543.mellex.util.HalfEdge;
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.mellex.util.Node;
 import io.github.jhg543.mellex.util.ZeroBasedStringIdGenerator;
+import io.github.jhg543.nyallas.graphmodel.VolatileTableRemover;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
 
@@ -28,7 +29,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -111,8 +114,11 @@ public class StringEdgePrinter {
 
 			err.println("-------Semantic OK, Writing result --------");
 
-			DAG dag = new DAG();
-			ZeroBasedStringIdGenerator ids = new ZeroBasedStringIdGenerator();
+			VolatileTableRemover graph = new VolatileTableRemover();
+			// DAG dag = new DAG();
+			// ZeroBasedStringIdGenerator ids = new
+			// ZeroBasedStringIdGenerator();
+			Map<String, VolatileTableRemover.Vertex> vmap = new HashMap<>();
 			try (PrintWriter out = new PrintWriter(dstdir.resolve("out").toAbsolutePath().toString(), "utf-8")) {
 				out.println("ScriptID StmtID StmtType DestCol SrcCol ConnectionType");
 				String template = "%d %d %s %s.%s %s.%s %d\n";
@@ -158,8 +164,8 @@ public class StringEdgePrinter {
 							}
 
 							for (ResultColumn c : q.columns) {
-								for (InfSource source:c.inf.getSources()) {
-									ObjectName srcname  = source.getSourceObject();
+								for (InfSource source : c.inf.getSources()) {
+									ObjectName srcname = source.getSourceObject();
 									String srcTable = srcname.toDotStringExceptLast();
 
 									boolean isSrcVT = vts.contains(srcTable);
@@ -172,15 +178,33 @@ public class StringEdgePrinter {
 									// collapse volatile table
 									String dst = dstTable + "." + c.name;
 									String src = srcTable + "." + srcname.toDotStringLast();
-									Integer dstnum = ids.queryNumber(dst);
-									Integer srcnum = ids.queryNumber(src);
-									dag.addEdge(srcnum, dstnum, source.getConnectionType().getMarker(), stmtNumber);
-									if (isDstVT) {
-										dag.setPerm(dstnum, false);
+									// Integer dstnum = ids.queryNumber(dst);
+									// Integer srcnum = ids.queryNumber(src);
+									VolatileTableRemover.Vertex srcv;
+									srcv = vmap.get(src);
+									if (srcv == null) {
+										srcv = graph.addVertex();
+										vmap.put(src, srcv);
+										srcv.setVertexData(src);
+
+										if (isSrcVT) {
+											srcv.setMarker(0);
+										}
 									}
-									if (isSrcVT) {
-										dag.setPerm(srcnum, false);
+									VolatileTableRemover.Vertex dstv;
+									dstv = vmap.get(dst);
+									if (dstv == null) {
+										dstv = graph.addVertex();
+										vmap.put(dst, dstv);
+										dstv.setVertexData(dst);
+
+										if (isDstVT) {
+											dstv.setMarker(0);
+										}
 									}
+									VolatileTableRemover.Edge edge = graph.newEdge(srcv, dstv);
+									edge.setEdgeData(source.getConnectionType().getMarker());
+									graph.addEdge(edge);
 
 								}
 
@@ -197,14 +221,15 @@ public class StringEdgePrinter {
 				w.walk(pr, tree);
 			}
 
-			Int2ObjectMap<Node> collapsed = dag.collapse(scriptNumber);
+			// Int2ObjectMap<Node> collapsed = dag.collapse(scriptNumber);
+			graph.remove();
 			try (PrintWriter out = new PrintWriter(dstdir.resolve("novt").toAbsolutePath().toString(), "utf-8")) {
 				out.println("scriptid,dstsch,dsttbl,dstcol,srcsch,srctbl,srccol,contype");
 				String template = "%d,%s,%s,%s,%s,%s,%s,%d\n";
-				for (Entry<Node> et : collapsed.int2ObjectEntrySet()) {
-					for (HalfEdge hf : et.getValue().getOutEdges()) {
-						String dst = ids.queryString(hf.getDest());
-						String src = ids.queryString(et.getKey());
+				for (VolatileTableRemover.Vertex v : graph.getVertexes()) {
+					for (VolatileTableRemover.Edge e : v.getOutgoingEdges()) {
+						String dst = e.getTarget().getVertexData();
+						String src = e.getSource().getVertexData();
 						List<String> t1 = Splitter.on('.').splitToList(dst);
 						if (t1.size() == 2) {
 							t1 = new ArrayList<String>(t1);
@@ -216,7 +241,7 @@ public class StringEdgePrinter {
 							t2.add(0, "3X_NOSCHEMA_" + scriptNumber);
 						}
 						out.append(String.format(template, scriptNumber, t1.get(0), t1.get(1), t1.get(2), t2.get(0), t2.get(1),
-								t2.get(2), hf.getType()));
+								t2.get(2), e.getEdgeData()));
 					}
 				}
 			}
@@ -276,7 +301,8 @@ public class StringEdgePrinter {
 				&& x.toString().toUpperCase().endsWith("BIN\\" + x.getFileName().toString().toUpperCase());
 		// printStringEdge(Paths.get("d:/dataflow/work1/script/mafixed"),
 		// Paths.get("d:/dataflow/work2/mares"), filefilter, 0, false);
-		//printStringEdge(Paths.get("d:/dataflow/work1/debug"), Paths.get("d:/dataflow/work2/debugres"), filefilter, 0, false);
-		printStringEdge(Paths.get("d:/dataflow/work1/f1/sor"), Paths.get("d:/dataflow/work2/result2/sor"), filefilter, 0, false);
+		printStringEdge(Paths.get("d:/dataflow/work1/debug"), Paths.get("d:/dataflow/work2/debugres"), filefilter, 0, false);
+		// printStringEdge(Paths.get("d:/dataflow/work1/f1/sor"),
+		// Paths.get("d:/dataflow/work2/result2/sor"), filefilter, 0, false);
 	}
 }
