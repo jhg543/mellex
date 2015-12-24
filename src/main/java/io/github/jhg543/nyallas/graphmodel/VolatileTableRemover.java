@@ -1,13 +1,12 @@
 package io.github.jhg543.nyallas.graphmodel;
 
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class VolatileTableRemover extends DirectedGraph<String, Integer, Integer, Integer> {
-	private void remove(Vertex v) {
-		Set<Edge> incoming = v.getIncomingEdges();
-		Set<Edge> outgoing = v.getOutgoingEdges();
+public class VolatileTableRemover extends DirectedGraph<String, Integer> {
+	private void remove(Vertex<String, Integer> v) {
+		Set<Edge<String, Integer>> incoming = v.getIncomingEdges();
+		Set<Edge<String, Integer>> outgoing = v.getOutgoingEdges();
 
 		outgoing.forEach(oe -> {
 			oe.getTarget().getIncomingEdges().remove(oe);
@@ -19,11 +18,12 @@ public class VolatileTableRemover extends DirectedGraph<String, Integer, Integer
 
 		incoming.forEach(ie -> {
 			outgoing.forEach(oe -> {
-				Edge newedge = new Edge(ie.getSource(), oe.getTarget());
-				newedge.setEdgeData(ie.getEdgeData()*oe.getEdgeData());
+				Edge<String, Integer> newedge = new Edge<String, Integer>(ie.getSource(),
+						oe.getTarget());
+				newedge.setEdgeData(ie.getEdgeData() * oe.getEdgeData());
 				addEdge(newedge);
 				// TODO ...
-				
+
 			});
 		});
 		getVertexes().remove(v);

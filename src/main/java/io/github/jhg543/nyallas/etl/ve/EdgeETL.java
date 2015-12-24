@@ -1,8 +1,6 @@
 package io.github.jhg543.nyallas.etl.ve;
 
-import org.jgrapht.graph.DefaultEdge;
-
-public class EdgeETL extends DefaultEdgeWithSE<VertexDBCol> {
+public class EdgeETL  {
 	private String scriptname;
 	private String conntype;
 

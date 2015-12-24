@@ -18,25 +18,29 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.nyallas.etl.algorithm.LineageFinder;
 import io.github.jhg543.nyallas.etl.algorithm.SimRank;
 import io.github.jhg543.nyallas.etl.ve.EdgeETL;
 import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
 
-import org.jgrapht.DirectedGraph;
-import org.jgrapht.graph.DefaultDirectedGraph;
-import org.jgrapht.graph.DirectedPseudograph;
+
+import io.github.jhg543.nyallas.graphmodel.DirectedGraph;
+import io.github.jhg543.nyallas.graphmodel.Edge;
+import io.github.jhg543.nyallas.graphmodel.Vertex;
+
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
 public class CsvGraphReader {
-
-	private Map<String, VertexDBCol> vertexNames;
+	
+	private Map<String, Vertex<VertexDBCol, EdgeETL>> vertexNames;
+	
 	private DirectedGraph<VertexDBCol, EdgeETL> graph;
 
-	public Map<String, VertexDBCol> getVertexNames() {
+	public Map<String, Vertex<VertexDBCol, EdgeETL>> getVertexNames() {
 		return vertexNames;
 	}
 
@@ -44,7 +48,7 @@ public class CsvGraphReader {
 		return graph;
 	}
 
-	private VertexDBCol getTableVertex(String s, String t, String c) {
+	private Vertex<VertexDBCol, EdgeETL> getTableVertex(String s, String t, String c) {
 		s = s.intern();
 		t = t.intern();
 		c = c.intern();
@@ -53,42 +57,43 @@ public class CsvGraphReader {
 		fqnsb.append('.');
 		fqnsb.append(t);
 		String fqn = fqnsb.toString().intern();
-		VertexDBCol v = vertexNames.get(fqn);
+		Vertex<VertexDBCol, EdgeETL>  v = vertexNames.get(fqn);
 		if (v == null) {
-			v = new VertexDBCol();
-			v.setColumn(t);
-			v.setTable(t);
-			v.setSchema(s);
-			v.setFqn(fqn);
+			v = graph.addVertex();
+			VertexDBCol vc = new VertexDBCol();
+			vc.setColumn(t);
+			vc.setTable(t);
+			vc.setSchema(s);
+			vc.setFqn(fqn);
 			vertexNames.put(fqn, v);
-			graph.addVertex(v);
+			v.setVertexData(vc);
 		}
 		return v;
 	}
 
 	public void readTableCsv(Path path) {
-		graph = new DefaultDirectedGraph<VertexDBCol, EdgeETL>(EdgeETL.class);
-		vertexNames = new HashMap<String, VertexDBCol>();
+		EdgeETL dummyed = new EdgeETL();
+		dummyed.setConntype("0");
+		dummyed.setScriptname("0");
+		graph = new DirectedGraph<VertexDBCol, EdgeETL>();
+		vertexNames = new HashMap<>();
 		try {
 			Files.readAllLines(path).forEach(line -> {
 				List<String> linelist = Splitter.on(',').splitToList(line);
-				VertexDBCol end = getTableVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(2));
-				VertexDBCol start = getTableVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(5));
-				EdgeETL edge = graph.getEdge(start, end);
-				if (edge == null) {
-					edge = graph.addEdge(start, end);
-					edge.setScriptname("");
+				Vertex<VertexDBCol, EdgeETL> end = getTableVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(2));
+				Vertex<VertexDBCol, EdgeETL> start = getTableVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(5));
+				Edge<VertexDBCol, EdgeETL> edge = new Edge<>(start, end);
+				if (!start.getOutgoingEdges().contains(edge)) {
+					edge.setEdgeData(dummyed);
+					graph.addEdge(edge);
 				}
-				edge.setScriptname(linelist.get(0));
-				edge.setConntype(linelist.get(7));
-
 			});
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private VertexDBCol getVertex(String s, String t, String c) {
+	private Vertex<VertexDBCol, EdgeETL> getVertex(String s, String t, String c) {
 		s = s.intern();
 		t = t.intern();
 		c = c.intern();
@@ -99,57 +104,61 @@ public class CsvGraphReader {
 		fqnsb.append('.');
 		fqnsb.append(c);
 		String fqn = fqnsb.toString().intern();
-		VertexDBCol v = vertexNames.get(fqn);
+		Vertex<VertexDBCol, EdgeETL> v = vertexNames.get(fqn);
 		if (v == null) {
-			v = new VertexDBCol();
-			v.setColumn(c);
-			v.setTable(t);
-			v.setSchema(s);
-			v.setFqn(fqn);
+			v = graph.addVertex();
+			VertexDBCol vc = new VertexDBCol();
+			vc.setColumn(c);
+			vc.setTable(t);
+			vc.setSchema(s);
+			vc.setFqn(fqn);
+			v.setVertexData(vc);
 			vertexNames.put(fqn, v);
-			graph.addVertex(v);
 		}
 		return v;
 	}
 
 	public void readCsv(Path path) {
-
-		graph = new DirectedPseudograph<VertexDBCol, EdgeETL>(EdgeETL.class);
-		vertexNames = new HashMap<String, VertexDBCol>();
+		graph = new DirectedGraph<VertexDBCol, EdgeETL>();
+		vertexNames = new HashMap<>();
 		try {
 			Files.readAllLines(path).forEach(line -> {
 				List<String> linelist = Splitter.on(',').splitToList(line);
-				VertexDBCol end = getVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(3));
-				VertexDBCol start = getVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(6));
-				EdgeETL edge = graph.addEdge(start, end);
-				edge.setScriptname(linelist.get(0));
-				edge.setConntype(linelist.get(7));
-
+				Vertex<VertexDBCol, EdgeETL> end = getVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(3));
+				Vertex<VertexDBCol, EdgeETL> start = getVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(6));
+				Edge<VertexDBCol, EdgeETL> edge = new Edge<>(start, end);
+				if (!start.getOutgoingEdges().contains(edge)) {
+					EdgeETL ed = new EdgeETL();
+					ed.setScriptname(linelist.get(0));
+					ed.setConntype(linelist.get(7));
+					edge.setEdgeData(ed);
+					graph.addEdge(edge);	
+				}
 			});
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	public static void outputEdges(List<EdgeETL> es, Path path) {
+	public static void outputEdges(List<Edge<VertexDBCol, EdgeETL>> es, Path path) {
 		try (PrintWriter writer = new PrintWriter(path.toFile())) {
 
 			es.stream().forEach(y -> {
-				writer.append(y.getScriptname());
+				writer.append(y.getEdgeData().getScriptname());
 				writer.append(',');
-				writer.append(y.getTarget().getSchema());
+				writer.append(y.getTarget().getVertexData().getSchema());
 				writer.append(',');
-				writer.append(y.getTarget().getTable());
+				writer.append(y.getTarget().getVertexData().getTable());
 				writer.append(',');
-				writer.append(y.getTarget().getColumn());
+				writer.append(y.getTarget().getVertexData().getColumn());
 				writer.append(',');
-				writer.append(y.getSource().getSchema());
+				writer.append(y.getSource().getVertexData().getSchema());
 				writer.append(',');
-				writer.append(y.getSource().getTable());
+				writer.append(y.getSource().getVertexData().getTable());
 				writer.append(',');
-				writer.append(y.getSource().getColumn());
+				writer.append(y.getSource().getVertexData().getColumn());
 				writer.append(',');
-				writer.append(y.getConntype());
+				writer.append(y.getEdgeData().getConntype());
 				writer.println();
 			});
 		} catch (FileNotFoundException e) {
@@ -157,7 +166,7 @@ public class CsvGraphReader {
 		}
 	};
 
-	public void gensvg() {
+	public static  void gensvg() {
 
 		try {
 			CsvGraphReader r = new CsvGraphReader();
@@ -168,16 +177,16 @@ public class CsvGraphReader {
 			Path layoutoutputinversed = Paths.get("d:/manual_graph2.svg");
 			r.readTableCsv(src);
 			System.out.println("read complate");
-			List<VertexDBCol> vs = r.vertexNames.values().stream().filter(x -> x.getTable().equals("T80_LIAB_CORP_ACCT_IDX_DD"))
+			List<Vertex<VertexDBCol, EdgeETL>> vs = r.vertexNames.values().stream().filter(x -> x.getVertexData().getTable().equals("T80_LIAB_CORP_ACCT_IDX_DD"))
 					.collect(Collectors.toList());
-			Predicate<EdgeETL> test = x -> {
+			Predicate<Edge<VertexDBCol, EdgeETL>> test = x -> {
 				// System.out.println(x.getSource().getFqn());
 				// System.out.println(x.getTarget().getFqn());
-				return !x.getSource().getSchema().equals(x.getTarget().getSchema());
+				return !x.getSource().getVertexData().getSchema().equals(x.getTarget().getVertexData().getSchema());
 			};
 
 			System.out.println("find complate");
-			List<EdgeETL> es = LineageFinder.find(r.graph, vs, test);
+			List<Edge<VertexDBCol, EdgeETL>> es = LineageFinder.find(r.graph, vs, test);
 			r.outputEdges(es, filteredfile);
 			ProcessBuilder processbuilder = new ProcessBuilder(ImmutableList.of(layoutExecutable.toString(),
 					filteredfile.toString(), layoutoutput.toString(), "1000"));
@@ -226,21 +235,6 @@ public class CsvGraphReader {
 		
 	}
 	public static void main(String[] args) throws Exception {
-		System.out.println(sizeOf(new Object()));
-		CsvGraphReader r = new CsvGraphReader();
-		Path src = Paths.get("d:/z1.csv");
-		r.readTableCsv(src);
-
-		SimRank ranker = new SimRank();
-		
-		ranker.convertG2(r.graph);
-		System.out.println(ranker.ec);
-		ranker.doiteration(1);
-		ranker.getSortedDvs().stream().filter(x->x.getA()!=x.getB()).limit(10).forEach(x->{
-			System.out.print(x.getRanki1());
-			System.out.print(x.getA().getInternal_id());
-			System.out.print(x.getB().getInternal_id());
-			System.out.println();
-		});
+		gensvg();
 	}
 }

@@ -17,6 +17,8 @@ import io.github.jhg543.mellex.util.HalfEdge;
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.mellex.util.Node;
 import io.github.jhg543.mellex.util.ZeroBasedStringIdGenerator;
+import io.github.jhg543.nyallas.graphmodel.Edge;
+import io.github.jhg543.nyallas.graphmodel.Vertex;
 import io.github.jhg543.nyallas.graphmodel.VolatileTableRemover;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
@@ -118,7 +120,7 @@ public class StringEdgePrinter {
 			// DAG dag = new DAG();
 			// ZeroBasedStringIdGenerator ids = new
 			// ZeroBasedStringIdGenerator();
-			Map<String, VolatileTableRemover.Vertex> vmap = new HashMap<>();
+			Map<String, Vertex<String, Integer>> vmap = new HashMap<>();
 			try (PrintWriter out = new PrintWriter(dstdir.resolve("out").toAbsolutePath().toString(), "utf-8")) {
 				out.println("ScriptID StmtID StmtType DestCol SrcCol ConnectionType");
 				String template = "%d %d %s %s.%s %s.%s %d\n";
@@ -180,7 +182,7 @@ public class StringEdgePrinter {
 									String src = srcTable + "." + srcname.toDotStringLast();
 									// Integer dstnum = ids.queryNumber(dst);
 									// Integer srcnum = ids.queryNumber(src);
-									VolatileTableRemover.Vertex srcv;
+									Vertex<String, Integer> srcv;
 									srcv = vmap.get(src);
 									if (srcv == null) {
 										srcv = graph.addVertex();
@@ -191,7 +193,7 @@ public class StringEdgePrinter {
 											srcv.setMarker(0);
 										}
 									}
-									VolatileTableRemover.Vertex dstv;
+									Vertex<String, Integer> dstv;
 									dstv = vmap.get(dst);
 									if (dstv == null) {
 										dstv = graph.addVertex();
@@ -202,7 +204,7 @@ public class StringEdgePrinter {
 											dstv.setMarker(0);
 										}
 									}
-									VolatileTableRemover.Edge edge = graph.newEdge(srcv, dstv);
+									Edge<String, Integer> edge = graph.newEdge(srcv, dstv);
 									edge.setEdgeData(source.getConnectionType().getMarker());
 									graph.addEdge(edge);
 
@@ -226,8 +228,8 @@ public class StringEdgePrinter {
 			try (PrintWriter out = new PrintWriter(dstdir.resolve("novt").toAbsolutePath().toString(), "utf-8")) {
 				out.println("scriptid,dstsch,dsttbl,dstcol,srcsch,srctbl,srccol,contype");
 				String template = "%d,%s,%s,%s,%s,%s,%s,%d\n";
-				for (VolatileTableRemover.Vertex v : graph.getVertexes()) {
-					for (VolatileTableRemover.Edge e : v.getOutgoingEdges()) {
+				for (Vertex<String, Integer> v : graph.getVertexes()) {
+					for (Edge<String, Integer> e : v.getOutgoingEdges()) {
 						String dst = e.getTarget().getVertexData();
 						String src = e.getSource().getVertexData();
 						List<String> t1 = Splitter.on('.').splitToList(dst);

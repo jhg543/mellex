@@ -21,7 +21,7 @@ public class SimRank {
 //	}
 
 	
-	
+	/*
 	private ArrayList<VertexDBCol> vs;
 	private ArrayList<DoubleVertex> dvs;
 	private double iterConstant = 0.8;
@@ -191,5 +191,5 @@ public class SimRank {
 			}
 		}
 	}
-
+*/
 }

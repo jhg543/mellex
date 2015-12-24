@@ -124,6 +124,11 @@
 			<artifactId>jgrapht-core</artifactId>
 			<version>0.9.1</version>
 		</dependency>
+		<dependency>
+			<groupId>org.eclipse.kieler</groupId>
+			<artifactId>klay-emf</artifactId>
+			<version>201506</version>
+		</dependency>
 	</dependencies>
 
 	<build>

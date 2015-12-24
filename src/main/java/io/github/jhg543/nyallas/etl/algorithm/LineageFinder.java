@@ -1,32 +1,31 @@
 package io.github.jhg543.nyallas.etl.algorithm;
 
+import io.github.jhg543.nyallas.etl.ve.EdgeETL;
+import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
+import io.github.jhg543.nyallas.graphmodel.DirectedGraph;
+import io.github.jhg543.nyallas.graphmodel.Edge;
+import io.github.jhg543.nyallas.graphmodel.Vertex;
+
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
-import io.github.jhg543.nyallas.etl.ve.EdgeETL;
-import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
-
-import org.jgrapht.DirectedGraph;
-import org.jgrapht.graph.DirectedPseudograph;
-
 public class LineageFinder {
 
 	DirectedGraph<VertexDBCol, EdgeETL> g;
-	Set<VertexDBCol> visited = new HashSet<VertexDBCol>();
-	Predicate<EdgeETL> test;
-	List<EdgeETL> results = new ArrayList<EdgeETL>();
-	private void findA(VertexDBCol v) {
-		if (visited.contains(v)) {
+	Predicate<Edge<VertexDBCol, EdgeETL>> test;
+	List<Edge<VertexDBCol, EdgeETL>> results = new ArrayList<>();
+
+	private void findA(Vertex<VertexDBCol, EdgeETL> v) {
+		if (Boolean.TRUE.equals(v.getMarker())) {
 			return;
 		}
 
-		visited.add(v);
+		v.setMarker(Boolean.TRUE);
 
-		Set<EdgeETL> es = g.outgoingEdgesOf(v);
-		for (EdgeETL e : es) {
+		Set<Edge<VertexDBCol, EdgeETL>> es = v.getOutgoingEdges();
+		for (Edge<VertexDBCol, EdgeETL> e : es) {
 			if (test.test(e)) {
 				results.add(e);
 			}
@@ -35,27 +34,15 @@ public class LineageFinder {
 
 	}
 
-	private void findB(VertexDBCol v) {
-		if (visited.contains(v)) {
+	private void findB(Vertex<VertexDBCol, EdgeETL> v) {
+		if (Boolean.TRUE.equals(v.getMarker())) {
 			return;
 		}
 
-		visited.add(v);
+		v.setMarker(Boolean.TRUE);
 
-		Set<EdgeETL> es = g.incomingEdgesOf(v);
-		for (EdgeETL e : es) {
-			if (test.test(e)) {
-				results.add(e);
-			}
-			findB(e.getSource());
-		}
-
-	}
-	
-	private void findBAfterA(VertexDBCol v) {
-		
-		Set<EdgeETL> es = g.incomingEdgesOf(v);
-		for (EdgeETL e : es) {
+		Set<Edge<VertexDBCol, EdgeETL>> es = v.getIncomingEdges();
+		for (Edge<VertexDBCol, EdgeETL> e : es) {
 			if (test.test(e)) {
 				results.add(e);
 			}
@@ -64,11 +51,26 @@ public class LineageFinder {
 
 	}
 
-	public static List<EdgeETL> find(DirectedGraph<VertexDBCol, EdgeETL> g, List<VertexDBCol> vs, Predicate<EdgeETL> test) {
+	private void findBAfterA(Vertex<VertexDBCol, EdgeETL> v) {
+
+		Set<Edge<VertexDBCol, EdgeETL>> es = v.getIncomingEdges();
+		for (Edge<VertexDBCol, EdgeETL> e : es) {
+			if (test.test(e)) {
+				results.add(e);
+			}
+			findB(e.getSource());
+		}
+
+	}
+
+	public static List<Edge<VertexDBCol, EdgeETL>> find(DirectedGraph<VertexDBCol, EdgeETL> g,
+			List<Vertex<VertexDBCol, EdgeETL>> vs, Predicate<Edge<VertexDBCol, EdgeETL>> test) {
 		LineageFinder d = new LineageFinder();
 		d.g = g;
 		d.test = test;
-		for (VertexDBCol v : vs) {
+		g.getVertexes().forEach(x -> x.setMarker(Boolean.FALSE));
+
+		for (Vertex<VertexDBCol, EdgeETL> v : vs) {
 			d.findA(v);
 			d.findBAfterA(v);
 		}
