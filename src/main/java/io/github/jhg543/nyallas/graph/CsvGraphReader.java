@@ -186,7 +186,7 @@ public class CsvGraphReader {
 			};
 
 			System.out.println("find complate");
-			List<Edge<VertexDBCol, EdgeETL>> es = LineageFinder.find(r.graph, vs, test);
+			List<Edge<VertexDBCol, EdgeETL>> es = LineageFinder.find(r.graph, vs, test,true,false);
 			r.outputEdges(es, filteredfile);
 			ProcessBuilder processbuilder = new ProcessBuilder(ImmutableList.of(layoutExecutable.toString(),
 					filteredfile.toString(), layoutoutput.toString(), "1000"));

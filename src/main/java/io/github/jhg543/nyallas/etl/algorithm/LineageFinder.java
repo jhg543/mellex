@@ -64,15 +64,23 @@ public class LineageFinder {
 	}
 
 	public static List<Edge<VertexDBCol, EdgeETL>> find(DirectedGraph<VertexDBCol, EdgeETL> g,
-			List<Vertex<VertexDBCol, EdgeETL>> vs, Predicate<Edge<VertexDBCol, EdgeETL>> test) {
+			List<Vertex<VertexDBCol, EdgeETL>> vs, Predicate<Edge<VertexDBCol, EdgeETL>> test, Boolean forward, Boolean backward) {
 		LineageFinder d = new LineageFinder();
 		d.g = g;
 		d.test = test;
 		g.getVertexes().forEach(x -> x.setMarker(Boolean.FALSE));
 
+		if (forward && backward || !forward && !backward) {
+			throw new RuntimeException("not implemented");
+		}
 		for (Vertex<VertexDBCol, EdgeETL> v : vs) {
-			d.findA(v);
-			d.findBAfterA(v);
+			if (forward) {
+				d.findA(v);
+			}
+			if (backward) {
+				d.findB(v);
+			}
+			// d.findBAfterA(v);
 		}
 		return d.results;
 	}
