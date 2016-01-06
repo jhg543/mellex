@@ -19,6 +19,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 
+
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.nyallas.etl.algorithm.LineageFinder;
 import io.github.jhg543.nyallas.etl.algorithm.SimRank;
@@ -26,9 +27,11 @@ import io.github.jhg543.nyallas.etl.ve.EdgeETL;
 import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
 
 
+import io.github.jhg543.nyallas.graphmodel.BasicEdge;
 import io.github.jhg543.nyallas.graphmodel.DirectedGraph;
 import io.github.jhg543.nyallas.graphmodel.Edge;
 import io.github.jhg543.nyallas.graphmodel.Vertex;
+
 
 
 import com.google.common.base.Splitter;
@@ -82,7 +85,7 @@ public class CsvGraphReader {
 				List<String> linelist = Splitter.on(',').splitToList(line);
 				Vertex<VertexDBCol, EdgeETL> end = getTableVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(2));
 				Vertex<VertexDBCol, EdgeETL> start = getTableVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(5));
-				Edge<VertexDBCol, EdgeETL> edge = new Edge<>(start, end);
+				Edge<VertexDBCol, EdgeETL> edge = new BasicEdge<>(start, end);
 				if (!start.getOutgoingEdges().contains(edge)) {
 					edge.setEdgeData(dummyed);
 					graph.addEdge(edge);
@@ -126,7 +129,7 @@ public class CsvGraphReader {
 				List<String> linelist = Splitter.on(',').splitToList(line);
 				Vertex<VertexDBCol, EdgeETL> end = getVertex(Misc.schemaSym(linelist.get(1)), linelist.get(2), linelist.get(3));
 				Vertex<VertexDBCol, EdgeETL> start = getVertex(Misc.schemaSym(linelist.get(4)), linelist.get(5), linelist.get(6));
-				Edge<VertexDBCol, EdgeETL> edge = new Edge<>(start, end);
+				Edge<VertexDBCol, EdgeETL> edge = new BasicEdge<>(start, end);
 				if (!start.getOutgoingEdges().contains(edge)) {
 					EdgeETL ed = new EdgeETL();
 					ed.setScriptname(linelist.get(0));

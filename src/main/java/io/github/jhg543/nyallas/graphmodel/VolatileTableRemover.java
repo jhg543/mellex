@@ -18,7 +18,7 @@ public class VolatileTableRemover extends DirectedGraph<String, Integer> {
 
 		incoming.forEach(ie -> {
 			outgoing.forEach(oe -> {
-				Edge<String, Integer> newedge = new Edge<String, Integer>(ie.getSource(),
+				Edge<String, Integer> newedge = new BasicEdge<String, Integer>(ie.getSource(),
 						oe.getTarget());
 				newedge.setEdgeData(ie.getEdgeData() * oe.getEdgeData());
 				addEdge(newedge);
