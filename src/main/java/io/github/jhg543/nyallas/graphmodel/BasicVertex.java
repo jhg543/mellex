@@ -1,12 +1,13 @@
 package io.github.jhg543.nyallas.graphmodel;
 
+import java.util.HashSet;
 import java.util.Set;
 
 public class BasicVertex <VERTEX_DATA, EDGE_DATA> implements Vertex<VERTEX_DATA, EDGE_DATA> {
 	VERTEX_DATA vertexData;
 	Object marker;
-	Set<Edge<VERTEX_DATA, EDGE_DATA>> outgoingEdges;
-	Set<Edge<VERTEX_DATA, EDGE_DATA>> incomingEdges;
+	Set<Edge<VERTEX_DATA, EDGE_DATA>> outgoingEdges = new HashSet<>();
+	Set<Edge<VERTEX_DATA, EDGE_DATA>> incomingEdges = new HashSet<>();
 
 	public VERTEX_DATA getVertexData() {
 		return vertexData;

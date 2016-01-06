@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 
 public class LineageFinder {
 
-	DirectedGraph<VertexDBCol, EdgeETL> g;
+	DirectedGraph<Vertex<VertexDBCol, EdgeETL>,Edge<VertexDBCol, EdgeETL>> g;
 	Predicate<Edge<VertexDBCol, EdgeETL>> test;
 	List<Edge<VertexDBCol, EdgeETL>> results = new ArrayList<>();
 
@@ -63,7 +63,7 @@ public class LineageFinder {
 
 	}
 
-	public static List<Edge<VertexDBCol, EdgeETL>> find(DirectedGraph<VertexDBCol, EdgeETL> g,
+	public static List<Edge<VertexDBCol, EdgeETL>> find(DirectedGraph<Vertex<VertexDBCol, EdgeETL>,Edge<VertexDBCol, EdgeETL>> g,
 			List<Vertex<VertexDBCol, EdgeETL>> vs, Predicate<Edge<VertexDBCol, EdgeETL>> test, Boolean forward, Boolean backward) {
 		LineageFinder d = new LineageFinder();
 		d.g = g;

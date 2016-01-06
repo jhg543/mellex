@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 
 
+
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.nyallas.etl.algorithm.LineageFinder;
 import io.github.jhg543.nyallas.etl.algorithm.SimRank;
@@ -28,9 +29,11 @@ import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
 
 
 import io.github.jhg543.nyallas.graphmodel.BasicEdge;
+import io.github.jhg543.nyallas.graphmodel.BasicVertex;
 import io.github.jhg543.nyallas.graphmodel.DirectedGraph;
 import io.github.jhg543.nyallas.graphmodel.Edge;
 import io.github.jhg543.nyallas.graphmodel.Vertex;
+
 
 
 
@@ -41,13 +44,13 @@ public class CsvGraphReader {
 	
 	private Map<String, Vertex<VertexDBCol, EdgeETL>> vertexNames;
 	
-	private DirectedGraph<VertexDBCol, EdgeETL> graph;
+	private DirectedGraph<Vertex<VertexDBCol, EdgeETL>,Edge<VertexDBCol, EdgeETL>> graph;
 
 	public Map<String, Vertex<VertexDBCol, EdgeETL>> getVertexNames() {
 		return vertexNames;
 	}
 
-	public DirectedGraph<VertexDBCol, EdgeETL> getGraph() {
+	public DirectedGraph<Vertex<VertexDBCol, EdgeETL>,Edge<VertexDBCol, EdgeETL>> getGraph() {
 		return graph;
 	}
 
@@ -62,7 +65,7 @@ public class CsvGraphReader {
 		String fqn = fqnsb.toString().intern();
 		Vertex<VertexDBCol, EdgeETL>  v = vertexNames.get(fqn);
 		if (v == null) {
-			v = graph.addVertex();
+			v = graph.addVertex(BasicVertex::new);
 			VertexDBCol vc = new VertexDBCol();
 			vc.setColumn(t);
 			vc.setTable(t);
@@ -78,7 +81,7 @@ public class CsvGraphReader {
 		EdgeETL dummyed = new EdgeETL();
 		dummyed.setConntype("0");
 		dummyed.setScriptname("0");
-		graph = new DirectedGraph<VertexDBCol, EdgeETL>();
+		graph = new DirectedGraph<>();
 		vertexNames = new HashMap<>();
 		try {
 			Files.readAllLines(path).forEach(line -> {
@@ -109,7 +112,7 @@ public class CsvGraphReader {
 		String fqn = fqnsb.toString().intern();
 		Vertex<VertexDBCol, EdgeETL> v = vertexNames.get(fqn);
 		if (v == null) {
-			v = graph.addVertex();
+			v = graph.addVertex(BasicVertex::new);
 			VertexDBCol vc = new VertexDBCol();
 			vc.setColumn(c);
 			vc.setTable(t);
@@ -122,7 +125,7 @@ public class CsvGraphReader {
 	}
 
 	public void readCsv(Path path) {
-		graph = new DirectedGraph<VertexDBCol, EdgeETL>();
+		graph = new DirectedGraph<Vertex<VertexDBCol, EdgeETL>,Edge<VertexDBCol, EdgeETL>>();
 		vertexNames = new HashMap<>();
 		try {
 			Files.readAllLines(path).forEach(line -> {

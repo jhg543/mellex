@@ -3,7 +3,7 @@ package io.github.jhg543.nyallas.graphmodel;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class VolatileTableRemover extends DirectedGraph<String, Integer> {
+public class VolatileTableRemover extends DirectedGraph<Vertex<String, Integer>, Edge<String, Integer>> {
 	private void remove(Vertex<String, Integer> v) {
 		Set<Edge<String, Integer>> incoming = v.getIncomingEdges();
 		Set<Edge<String, Integer>> outgoing = v.getOutgoingEdges();

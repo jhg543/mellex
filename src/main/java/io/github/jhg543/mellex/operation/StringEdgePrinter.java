@@ -17,6 +17,8 @@ import io.github.jhg543.mellex.util.HalfEdge;
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.mellex.util.Node;
 import io.github.jhg543.mellex.util.ZeroBasedStringIdGenerator;
+import io.github.jhg543.nyallas.graphmodel.BasicEdge;
+import io.github.jhg543.nyallas.graphmodel.BasicVertex;
 import io.github.jhg543.nyallas.graphmodel.Edge;
 import io.github.jhg543.nyallas.graphmodel.Vertex;
 import io.github.jhg543.nyallas.graphmodel.VolatileTableRemover;
@@ -185,7 +187,7 @@ public class StringEdgePrinter {
 									Vertex<String, Integer> srcv;
 									srcv = vmap.get(src);
 									if (srcv == null) {
-										srcv = graph.addVertex();
+										srcv = graph.addVertex(BasicVertex::new);
 										vmap.put(src, srcv);
 										srcv.setVertexData(src);
 
@@ -196,7 +198,7 @@ public class StringEdgePrinter {
 									Vertex<String, Integer> dstv;
 									dstv = vmap.get(dst);
 									if (dstv == null) {
-										dstv = graph.addVertex();
+										dstv = graph.addVertex(BasicVertex::new);
 										vmap.put(dst, dstv);
 										dstv.setVertexData(dst);
 
@@ -204,7 +206,7 @@ public class StringEdgePrinter {
 											dstv.setMarker(0);
 										}
 									}
-									Edge<String, Integer> edge = graph.newEdge(srcv, dstv);
+									Edge<String, Integer> edge = new BasicEdge<String, Integer>(srcv, dstv);
 									edge.setEdgeData(source.getConnectionType().getMarker());
 									graph.addEdge(edge);
 
