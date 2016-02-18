@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.nyallas.etl.algorithm.LineageFinder;
-import io.github.jhg543.nyallas.etl.algorithm.SimRank;
 import io.github.jhg543.nyallas.etl.ve.EdgeETL;
 import io.github.jhg543.nyallas.etl.ve.VertexDBCol;
 
