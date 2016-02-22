@@ -322,7 +322,11 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 						throw new RuntimeException("update target is subquery " + n);
 					}
 					targetTable.dbobj = query.dbobj;
-					break;
+					
+				}
+				else
+				{
+					tables.add(query);
 				}
 			}
 		}
@@ -334,10 +338,6 @@ public class ColumnDataFlowListener extends DefaultSQLBaseListener {
 
 		if (ctx.ta != null) {
 			targetTable.setAlias(ctx.ta.getText());
-		}
-
-		if (ctx.f != null) {
-			tables.addAll(ctx.f.tables);
 		}
 
 		if (ctx.wex != null) {

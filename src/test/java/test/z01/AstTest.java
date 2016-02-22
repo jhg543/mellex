@@ -26,8 +26,8 @@ public class AstTest {
 
 	@Parameters
 	public static Collection<Object[]> data() {
-		return Arrays.asList(new Object[][] { { "s001.sql", new int[] { 1, 0, 0, 0 } },
-				{ "s002.sql", new int[] { 0, 0, 0, 1 } }, { "s003.sql", new int[] { 1, 0, 0, 0 } } });
+		return Arrays.asList(new Object[][] { { "s007.sql", new int[] { 1, 0, 0, 0 } },
+				{ "s002.sql", new int[] { 0, 0, 0, 1 } }, { "s008.sql", new int[] { 1, 0, 0, 0 } } });
 	}
 
 	@Parameter(value = 0)

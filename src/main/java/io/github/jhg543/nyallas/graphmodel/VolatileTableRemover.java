@@ -18,8 +18,11 @@ public class VolatileTableRemover extends DirectedGraph<Vertex<String, Integer>,
 
 		incoming.forEach(ie -> {
 			outgoing.forEach(oe -> {
-				Edge<String, Integer> newedge = new BasicEdge<String, Integer>(ie.getSource(),
-						oe.getTarget());
+				if (ie.getSource() == v || oe.getTarget() == v) {
+					// removing this if will cause concurrent modification exception on incoming or outgoing
+					return;
+				}
+				Edge<String, Integer> newedge = new BasicEdge<String, Integer>(ie.getSource(), oe.getTarget());
 				newedge.setEdgeData(ie.getEdgeData() * oe.getEdgeData());
 				addEdge(newedge);
 				// TODO ...
