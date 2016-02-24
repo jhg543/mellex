@@ -5,6 +5,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * It should be IMMUTABLE...
+ *
+ */
 public class Influences {
 
 	private List<InfSource> sources = new ArrayList<InfSource>();
