@@ -1,47 +1,41 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-import io.github.jhg543.mellex.ASTHelper.ObjectName;
-import io.github.jhg543.mellex.ASTHelper.SubQuery;
+import io.github.jhg543.mellex.ASTHelper.InfSource;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
-public class FunctionDefinition {
+public class FunctionDefinition extends ObjectDefinition {
 	
 	List<VariableDefinition> parameters;
-	VariableDefinition returnValue;
-	List<SubQuery> mods;
-	ObjectName name;
-	ControlBlock controlBlock;
-	
+	private HashMap<String, Set<InfSource>> globalObjectUsage;
+	private Set<InfSource> branchCondUsage;
+	private Set<InfSource> returnValueUsage;
 	public List<VariableDefinition> getParameters() {
 		return parameters;
 	}
 	public void setParameters(List<VariableDefinition> parameters) {
 		this.parameters = parameters;
 	}
-	public VariableDefinition getReturnValue() {
-		return returnValue;
+	public HashMap<String, Set<InfSource>> getGlobalObjectUsage() {
+		return globalObjectUsage;
 	}
-	public void setReturnValue(VariableDefinition returnValue) {
-		this.returnValue = returnValue;
+	public void setGlobalObjectUsage(HashMap<String, Set<InfSource>> globalObjectUsage) {
+		this.globalObjectUsage = globalObjectUsage;
 	}
-	public List<SubQuery> getMods() {
-		return mods;
+	public Set<InfSource> getBranchCondUsage() {
+		return branchCondUsage;
 	}
-	public void setMods(List<SubQuery> mods) {
-		this.mods = mods;
+	public void setBranchCondUsage(Set<InfSource> branchCondUsage) {
+		this.branchCondUsage = branchCondUsage;
 	}
-	public ObjectName getName() {
-		return name;
+	public Set<InfSource> getReturnValueUsage() {
+		return returnValueUsage;
 	}
-	public void setName(ObjectName name) {
-		this.name = name;
+	public void setReturnValueUsage(Set<InfSource> returnValueUsage) {
+		this.returnValueUsage = returnValueUsage;
 	}
-	public ControlBlock getControlBlock() {
-		return controlBlock;
-	}
-	public void setControlBlock(ControlBlock controlBlock) {
-		this.controlBlock = controlBlock;
-	}
+	
 	
 }

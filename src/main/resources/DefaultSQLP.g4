@@ -92,13 +92,18 @@ create_procedure :
     ;
 
 
-procedure_heading :
-        K_PROCEDURE any_name parameter_declarations?
+procedure_or_function_declaration :
+        (K_PROCEDURE | K_FUNCTION) any_name parameter_declarations? (K_RETURN datatype)? ( K_DETERMINISTIC | K_PIPELINED | K_PARALLEL_ENABLE | K_RESULT_CACHE )*
     ;
 
-function_heading :
-        K_FUNCTION any_name parameter_declarations? K_RETURN datatype
-    ;
+procedure_or_function_definition :
+        procedure_or_function_declaration
+        ( K_IS | K_AS ) declare_section? body
+	;
+
+body 	:
+	K_BEGIN ( plsql_statement ';' )+ ( K_EXCEPTION exception_handler+ )? K_END any_name?
+	;
 
 parameter_declarations :
         (   '('  parameter_declaration ( ','  parameter_declaration )* ')' )
@@ -117,28 +122,21 @@ declare_section_oneline:
     type_definition
     | subtype_definition
     | cursor_definition
-    | item_declaration
-    | function_declaration
-    | procedure_declaration
+    | variable_declaration
+    | exception_declaration
+    | procedure_or_function_declaration
+    | procedure_or_function_definition
 ;
 
 cursor_definition :
         K_CURSOR any_name parameter_declarations? K_IS select_stmt
     ;
 
-item_declaration
-    : variable_declaration
-    | constant_declaration
-    | exception_declaration
-    ;
 
 variable_declaration :
-        any_name datatype (  (  K_NOT K_NULL )? (  ':='  | K_DEFAULT ) expr  )?
+        any_name K_CONSTANT? datatype (  (  K_NOT K_NULL )? (  ':='  | K_DEFAULT ) expr  )?
     ;
 
-constant_declaration :
-        any_name K_CONSTANT datatype ( K_NOT K_NULL )? (   ':='  | K_DEFAULT  ) expr
-    ;
 
 exception_declaration :
         any_name K_EXCEPTION
@@ -185,29 +183,7 @@ datatype
     : ( K_REF )? any_name ( '.' any_name )? ( '(' NUMERIC_LITERAL ( ',' NUMERIC_LITERAL )* ')' | '%' ( K_TYPE | K_ROWTYPE ) )?
     ;
 
-function_declaration :
-        function_heading
-        ( K_DETERMINISTIC | K_PIPELINED | K_PARALLEL_ENABLE | K_RESULT_CACHE )*
-    ;
 
-function_definition :
-        function_declaration
-        ( K_IS | K_AS ) declare_section? body
-	;
-
-
-procedure_declaration :
-	procedure_heading
-	;
-
-procedure_definition :
-	procedure_declaration
-	( K_IS | K_AS ) declare_section? body
-	;
-
-body 	:
-	K_BEGIN ( plsql_statement ';' )+ ( K_EXCEPTION exception_handler+ )? K_END any_name?
-	;
 
 
 exception_handler

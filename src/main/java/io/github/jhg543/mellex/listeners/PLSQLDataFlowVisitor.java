@@ -8,6 +8,8 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 
+import com.google.common.collect.ImmutableList;
+
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
 import io.github.jhg543.mellex.ASTHelper.Influences;
@@ -16,7 +18,10 @@ import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
 import io.github.jhg543.mellex.ASTHelper.UpdateStmt;
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
@@ -28,6 +33,9 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_procedureCon
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_source_tableContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_table_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_view_stmtContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Cursor_definitionContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Declare_sectionContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Declare_section_onelineContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr1Context;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr2Context;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr2poiContext;
@@ -48,6 +56,8 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Order_by_clauseCont
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Ordering_term_windowContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Parameter_declarationContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Parameter_declarationsContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Procedure_or_function_declarationContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Procedure_or_function_definitionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Qualify_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Result_columnAsteriskContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Result_columnContext;
@@ -67,6 +77,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Table_or_subqueryTa
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Update_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Update_stmt_fromContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Update_stmt_setContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Variable_declarationContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Where_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.WindowContext;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
@@ -79,27 +90,93 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private TokenStream stream;
 	private String current_sql;
 
-	
-	
-	
+	private ScopeStack scopeStack;
+
 	@Override
 	public Object visitCreate_procedure(Create_procedureContext ctx) {
-		
+
 		FunctionDefinition functionDefinition = new FunctionDefinition();
 		ctx.object_name().accept(this);
-		functionDefinition.setName(ctx.object_name().objname);
-		
+		functionDefinition.setName(ctx.object_name().getText());
 		List<VariableDefinition> parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
-		
+		functionDefinition.setParameters(parameterDefinitions);
+
 		return null;
-				
+
+	}
+
+	@Override
+	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
+		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
+		for (Declare_section_onelineContext vd:ctx.declare_section_oneline())
+		{
+			decls.add((ObjectDefinition) vd.accept(this));
+		}
+		return decls;
+	}
+
+	@Override
+	public ObjectDefinition visitDeclare_section_oneline(Declare_section_onelineContext ctx) {
+		return (ObjectDefinition) visitChildren(ctx);
+	}
+
+	@Override
+	public Object visitProcedure_or_function_declaration(Procedure_or_function_declarationContext ctx) {
+		throw new UnsupportedOperationException("FORWARD DECLARATION NOT SUPPORTED");
+	}
+
+	@Override
+	public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Object visitCursor_definition(Cursor_definitionContext ctx) {
+		CursorDefinition cursorDefinition = new CursorDefinition();
+		cursorDefinition.setName(ctx.any_name().getText());
+		List<VariableDefinition> parameterDefinitions = ImmutableList.of();
+		if (ctx.parameter_declarations() != null) {
+			parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations()
+					.accept(this);
+			
+		}
+		cursorDefinition.setParameters(parameterDefinitions);
+		
+		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions),false);
+		Select_stmtContext ssctx = ctx.select_stmt();
+		scopeStack.pop();
+		
+		ssctx.accept(this);
+		cursorDefinition.setSelectInf(ssctx.q);
+
+		return cursorDefinition;
+	}
+
+	@Override
+	public VariableDefinition visitVariable_declaration(Variable_declarationContext ctx) {
+		// COPY FROM visitParameter_declaration
+
+		VariableDefinition def = new VariableDefinition();
+		def.setMods(new ArrayList<>(2));
+		def.setName(ctx.any_name().getText());
+		def.setConst(ctx.K_CONSTANT() != null);
+		ExprContext exprContext = ctx.expr();
+		if (exprContext != null) {
+			exprContext.accept(this);
+			VariableModification vm = new VariableModification();
+			ResultColumn scalar = new ResultColumn();
+			scalar.inf = exprContext.inf;
+			vm.columns.add(scalar);
+			def.setDefaultValue(vm);
+		}
+		return def;
 	}
 
 	@Override
 	public List<VariableDefinition> visitParameter_declarations(Parameter_declarationsContext ctx) {
-		List<VariableDefinition> defs  = new ArrayList<VariableDefinition>();
-		for (Parameter_declarationContext vd : ctx.parameter_declaration())
-		{
+		List<VariableDefinition> defs = new ArrayList<VariableDefinition>();
+		for (Parameter_declarationContext vd : ctx.parameter_declaration()) {
 			defs.add((VariableDefinition) vd.accept(this));
 		}
 		return defs;
@@ -107,16 +184,18 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public VariableDefinition visitParameter_declaration(Parameter_declarationContext ctx) {
+		if (ctx.K_OUT() != null) {
+			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
+		}
 		VariableDefinition def = new VariableDefinition();
 		def.setMods(new ArrayList<>(2));
 		def.setName(ctx.any_name().getText());
 		ExprContext exprContext = ctx.expr();
-		if (exprContext!=null)
-		{
+		if (exprContext != null) {
 			exprContext.accept(this);
 			VariableModification vm = new VariableModification();
 			ResultColumn scalar = new ResultColumn();
-			scalar.inf = exprContext.inf; 
+			scalar.inf = exprContext.inf;
 			vm.columns.add(scalar);
 			def.setDefaultValue(vm);
 		}
@@ -1028,3 +1107,27 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		return null;
 	}
 }
+
+/*
+ * 
+ * A Graph–Free Approach to Data–Flow Analysis, Markus Mohnen
+ *
+ * Define State s:
+ * 
+ * 
+ * 
+ * 
+ * 
+ * Define I(s) state transition
+ * I(s):
+ * Assign
+ * Call
+ * Select into (multiple assign)
+ * Branch
+ * return
+ * Exception
+ * 
+ * 
+ * Define <= of lattice:
+ * 
+ */

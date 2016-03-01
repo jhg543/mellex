@@ -2,11 +2,11 @@ package io.github.jhg543.mellex.ASTHelper.plsql;
 
 import java.util.List;
 
-public class VariableDefinition {
+public class VariableDefinition extends ObjectDefinition {
 	private List<VariableModification> mods;
 	private VariableModification defaultValue;
 	private Boolean isScalar;
-	private String name;
+	private boolean isConst = false;
 	public List<VariableModification> getMods() {
 		return mods;
 	}
@@ -19,17 +19,17 @@ public class VariableDefinition {
 	public void setIsScalar(Boolean isScalar) {
 		this.isScalar = isScalar;
 	}
-	public String getName() {
-		return name;
-	}
-	public void setName(String name) {
-		this.name = name;
-	}
 	public VariableModification getDefaultValue() {
 		return defaultValue;
 	}
 	public void setDefaultValue(VariableModification defaultValue) {
 		this.defaultValue = defaultValue;
+	}
+	public boolean isConst() {
+		return isConst;
+	}
+	public void setConst(boolean isConst) {
+		this.isConst = isConst;
 	}
 	
 }
