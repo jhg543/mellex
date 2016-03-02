@@ -1,6 +1,8 @@
 package io.github.jhg543.mellex.listeners;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.antlr.v4.runtime.RuleContext;
@@ -26,6 +28,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Any_nameContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Case_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_defContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_defsContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Common_table_expressionContext;
@@ -51,11 +54,15 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Grouping_by_clauseC
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Having_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Insert_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Join_clauseContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.LabelContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Multiple_plsql_stmt_listContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Object_nameContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Order_by_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Ordering_term_windowContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Parameter_declarationContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Parameter_declarationsContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Plsql_statementContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Plsql_statement_nolabelContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Procedure_or_function_declarationContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Procedure_or_function_definitionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Qualify_clauseContext;
@@ -81,6 +88,9 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Variable_declaratio
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Where_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.WindowContext;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
+import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
+import io.github.jhg543.mellex.listeners.flowmfp.PatchList;
+import io.github.jhg543.mellex.listeners.flowmfp.VariableUsageState;
 import io.github.jhg543.mellex.util.Misc;
 
 @SuppressWarnings("unchecked")
@@ -94,6 +104,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitCreate_procedure(Create_procedureContext ctx) {
+		/*
+		 * parameter_declarations? (K_RETURN datatype)? ( K_IS | K_AS )
+		 * declare_section? body
+		 */
 
 		FunctionDefinition functionDefinition = new FunctionDefinition();
 		ctx.object_name().accept(this);
@@ -101,15 +115,84 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		List<VariableDefinition> parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
 		functionDefinition.setParameters(parameterDefinitions);
 
+		// push new scope , all outer variable are not visible
+		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions), false);
+
+		List<ObjectDefinition> objectDefinitions = Collections.EMPTY_LIST;
+		if (ctx.declare_section() != null) {
+			objectDefinitions = (List<ObjectDefinition>) ctx.declare_section().accept(this);
+		}
+		scopeStack.newBlock(objectDefinitions, true);
+
+		// pop decl
+		scopeStack.pop();
+
+		// pop parameter~
+		scopeStack.pop();
 		return null;
 
 	}
 
 	@Override
+	public PatchList visitCase_statement(Case_statementContext ctx) {
+		PatchList p = new PatchList();
+		if (ctx.selector!=null)
+		{
+			
+		}
+		
+		return super.visitCase_statement(ctx);
+	}
+
+	@Override
+	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
+		PatchList patchList = new PatchList();
+		patchList.setBreakList(new ArrayList<Instruction<VariableUsageState>>());
+		patchList.setContinueList(new ArrayList<Instruction<VariableUsageState>>());
+
+		PatchList prevpl = null;
+		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
+			PatchList currentpl = (PatchList) plsqlctx.accept(this);
+			patchList.getBreakList().addAll(currentpl.getBreakList());
+			patchList.getContinueList().addAll(currentpl.getContinueList());
+			if (prevpl != null) {
+				for (Instruction<VariableUsageState> ins : prevpl.getNextList()) {
+					ins.getNextPc().add(() -> currentpl.getStartInstruction());
+				}
+			} else {
+				patchList.setStartInstruction(currentpl.getStartInstruction());
+			}
+			prevpl = currentpl;
+		}
+		patchList.setNextList(prevpl.getNextList());
+		if (patchList.getBreakList().isEmpty()) {
+			patchList.setBreakList(Collections.EMPTY_LIST);
+		}
+		if (patchList.getContinueList().isEmpty()) {
+			patchList.setContinueList(Collections.EMPTY_LIST);
+		}
+		return patchList;
+	}
+
+	@Override
+	public PatchList visitPlsql_statement(Plsql_statementContext ctx) {
+		PatchList patchList = (PatchList) ctx.plsql_statement_nolabel().accept(this);
+		for (LabelContext labelctx : ctx.label()) {
+			String labelName = (String) labelctx.label_name().getText();
+			scopeStack.getLabels().put(labelName, patchList.getStartInstruction());
+		}
+		return patchList;
+	}
+
+	@Override
+	public PatchList visitPlsql_statement_nolabel(Plsql_statement_nolabelContext ctx) {
+		return (PatchList) visitChildren(ctx);
+	}
+
+	@Override
 	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
 		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
-		for (Declare_section_onelineContext vd:ctx.declare_section_oneline())
-		{
+		for (Declare_section_onelineContext vd : ctx.declare_section_oneline()) {
 			decls.add((ObjectDefinition) vd.accept(this));
 		}
 		return decls;
@@ -135,18 +218,17 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	public Object visitCursor_definition(Cursor_definitionContext ctx) {
 		CursorDefinition cursorDefinition = new CursorDefinition();
 		cursorDefinition.setName(ctx.any_name().getText());
-		List<VariableDefinition> parameterDefinitions = ImmutableList.of();
+		List<VariableDefinition> parameterDefinitions = Collections.EMPTY_LIST;
 		if (ctx.parameter_declarations() != null) {
-			parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations()
-					.accept(this);
-			
+			parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
+
 		}
 		cursorDefinition.setParameters(parameterDefinitions);
-		
-		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions),false);
+
+		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions), false);
 		Select_stmtContext ssctx = ctx.select_stmt();
 		scopeStack.pop();
-		
+
 		ssctx.accept(this);
 		cursorDefinition.setSelectInf(ssctx.q);
 
@@ -1111,23 +1193,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 /*
  * 
  * A Graph–Free Approach to Data–Flow Analysis, Markus Mohnen
- *
+ * 
  * Define State s:
  * 
  * 
  * 
  * 
  * 
- * Define I(s) state transition
- * I(s):
- * Assign
- * Call
- * Select into (multiple assign)
- * Branch
- * return
- * Exception
+ * Define I(s) state transition I(s): Assign Call Select into (multiple assign)
+ * Branch return Exception
  * 
  * 
  * Define <= of lattice:
- * 
  */

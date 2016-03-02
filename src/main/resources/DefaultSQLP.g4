@@ -102,7 +102,7 @@ procedure_or_function_definition :
 	;
 
 body 	:
-	K_BEGIN ( plsql_statement ';' )+ ( K_EXCEPTION exception_handler+ )? K_END any_name?
+	K_BEGIN multiple_plsql_stmt_list ( K_EXCEPTION exception_handler+ )? K_END any_name?
 	;
 
 parameter_declarations :
@@ -188,13 +188,18 @@ datatype
 
 exception_handler
 	:	K_WHEN ( qual_id  ( K_OR qual_id  )* | K_OTHERS )
-		K_THEN ( plsql_statement ';' )+
+		K_THEN multiple_plsql_stmt_list
 	;
 
+multiple_plsql_stmt_list :
+    ( plsql_statement ';' )+
+;
 
 plsql_statement :
-    label*
-    (  case_statement
+    label* plsql_statement_nolabel;
+
+plsql_statement_nolabel:
+      case_statement
     | close_statement
     | continue_statement
     | basic_loop_statement
@@ -213,8 +218,7 @@ plsql_statement :
     | sql_stmt
     | while_loop_statement
     | assign_or_call_statement
-    )
-    ;
+;
 /*
 lvalue
     : call ( '.' call )*
@@ -239,13 +243,13 @@ assign_or_call_statement:
     ;
 
 basic_loop_statement :
-        K_LOOP ( plsql_statement ';' )+ K_END K_LOOP label_name?
+        K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
 case_statement :
-        K_CASE expr?
-        ( K_WHEN expr K_THEN ( plsql_statement ';' )+ )+
-        ( K_ELSE plsql_statement ';' )?
+        K_CASE selector=expr?
+        ( K_WHEN selector_vals+=expr K_THEN then_stmts+=multiple_plsql_stmt_list )+
+        ( K_ELSE else_stmts=multiple_plsql_stmt_list )?
         K_END K_CASE label_name?
     ;
 
@@ -297,7 +301,7 @@ dynamic_returning_clause :
 
 for_loop_statement :
 
-        K_FOR any_name K_IN ( ~(K_LOOP) )+ K_LOOP ( plsql_statement ';' )+ K_END K_LOOP label_name?
+        K_FOR any_name K_IN ( ~(K_LOOP) )+ K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
 forall_statement :
@@ -305,7 +309,7 @@ forall_statement :
     ;
 
 while_loop_statement :
-        K_WHILE expr K_LOOP ( plsql_statement ';' )+ K_END K_LOOP label_name?
+        K_WHILE expr K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
 bounds_clause
@@ -320,9 +324,9 @@ goto_statement :
     ;
 
 if_statement :
-        K_IF expr K_THEN ( plsql_statement ';' )+
-        ( K_ELSIF expr K_THEN ( plsql_statement ';' )+ )*
-        ( K_ELSE ( plsql_statement ';' )+ )?
+        K_IF expr K_THEN multiple_plsql_stmt_list
+        ( K_ELSIF expr K_THEN multiple_plsql_stmt_list )*
+        ( K_ELSE multiple_plsql_stmt_list )?
         K_END K_IF
     ;
 
