@@ -80,6 +80,12 @@ public class ScopeStack {
 
 		return null;
 	}
+	
+	public ObjectDefinition searchByName(String s)
+	{
+		//TODO implement here
+		return null;
+	}
 
 	public Map<String, Instruction<VariableUsageState>> getLabels() {
 		return labels;

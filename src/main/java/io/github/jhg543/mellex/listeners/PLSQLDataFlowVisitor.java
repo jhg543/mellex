@@ -24,12 +24,15 @@ import io.github.jhg543.mellex.ASTHelper.ObjectName;
 import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
 import io.github.jhg543.mellex.ASTHelper.UpdateStmt;
+import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ExprAnalyzeResult;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
 import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
-import io.github.jhg543.mellex.ASTHelper.plsql.StateTransformDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
+import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
@@ -106,6 +109,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private TableDefinitionProvider provider;
 	private TokenStream stream;
 	private String current_sql;
+	private String fileID;
 	private List<Instruction<VariableUsageState>> instbuffer;
 	private Set<String> unmetFunctionNames;
 
@@ -628,45 +632,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		}
 	}
 
-	private void exitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addAll(ctx.sp.inf);
-		ctx.inf = cinf;
-	}
-
-	private void exitExprObject(ExprObjectContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addInResultExpression(ctx.obj.objname);
-		ctx.objname = ctx.obj.objname;
-		ctx.inf = cinf;
-	}
-
-	private void exitExprLiteral(ExprLiteralContext ctx) {
-		Influences cinf = new Influences();
-		ctx.inf = cinf;
-	}
-
-	private void exitSpecial_function1(Special_function1Context ctx) {
-		Influences cinf = new Influences();
-		cinf.addAll(ctx.operand1.inf);
-		ctx.inf = cinf;
-	}
-
-	private void exitSpecial_functionSubString(Special_functionSubStringContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addAll(ctx.operand1.inf);
-		cinf.addAllInClause(ctx.operand2.inf);
-		if (ctx.operand3 != null) {
-			cinf.addAllInClause(ctx.operand3.inf);
-		}
-		ctx.inf = cinf;
-	}
-
-	private void exitSpecial_functionDateTime(Special_functionDateTimeContext ctx) {
-		Influences cinf = new Influences();
-		ctx.inf = cinf;
-	}
-
 	private void exitObject_name(Object_nameContext ctx) {
 		ObjectName name = new ObjectName();
 		for (Any_nameContext s : ctx.d) {
@@ -954,51 +919,59 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		for (ExprContext param : ctx.ax) {
 			e.add((ExprAnalyzeResult) param.accept(this));
 		}
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e.stream().map(ExprAnalyzeResult::getTransformation)
-				.collect(Collectors.toList())));
+		return new ExprAnalyzeResult(StateFunc
+				.combine(e.stream().map(ExprAnalyzeResult::getTransformation).collect(Collectors.toList())));
 	}
 
 	@Override
 	public Object visitExprFunction(ExprFunctionContext ctx) {
 
-
-//		for (ExprContext param : ctx.ex) {
-//			cinf.addAll(param.inf);
-//		}
-//		if (ctx.wx != null) {
-//			cinf.addAllInClause(ctx.wx.inf);
-//		}
+		// for (ExprContext param : ctx.ex) {
+		// cinf.addAll(param.inf);
+		// }
+		// if (ctx.wx != null) {
+		// cinf.addAllInClause(ctx.wx.inf);
+		// }
 		FunctionDefinition fndef = null;
-		
+
 		if (ctx.function_name() != null) {
 			String fn = ctx.function_name().getText();
 			fndef = scopeStack.searchByName(fn, FunctionDefinition.class);
-			if ( fndef == null) {
+			if (fndef == null) {
 				unmetFunctionNames.add(fn);
 			}
 		}
-		
+
 		return null;
 	}
 
 	@Override
 	public ExprAnalyzeResult visitExprExists(ExprExistsContext ctx) {
-		StateTransformDefinition ss = (StateTransformDefinition) ctx.ss.accept(this);
+		StateFunc ss = (StateFunc) ctx.ss.accept(this);
 		return new ExprAnalyzeResult(ss);
 	}
 
 	@Override
-	public Object visitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
-		visitChildren(ctx);
-		exitExprSpecialFunction(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
+		return (ExprAnalyzeResult) ctx.sp.accept(this);
 	}
 
 	@Override
-	public Object visitExprObject(ExprObjectContext ctx) {
-		visitChildren(ctx);
-		exitExprObject(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
+		String name = ctx.getText();
+		ObjectDefinition def = scopeStack.searchByName(name);
+
+		if (def instanceof ColumnDefinition) {
+			ObjectReference r = new ObjectReference();
+			r.setLineNumber(ctx.getStart().getLine());
+			r.setCharPosition(ctx.getStart().getLine());
+			r.setFileName(fileID);
+			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
+		} else if (def instanceof VariableDefinition) {
+			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(def)), name);
+		} else {
+			throw new RuntimeException("Unexpected ObjectDefinition type" + def.getClass().toString());
+		}
 	}
 
 	@Override
@@ -1006,29 +979,27 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()));
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
 
 	}
 
 	@Override
 	public ExprAnalyzeResult visitExpr1(Expr1Context ctx) {
 		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e.getTransformation()));
+		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
 	}
 
-	private static String compressQuotes(String paramString1, String paramString2)
-	  {
-	    String str = paramString1;
-	    for (int i = str.indexOf(paramString2); i != -1; i = str.indexOf(paramString2, i + 1))
-	      str = str.substring(0, i + 1) + str.substring(i + 2);
-	    return str;
-     }
-
-	private static String escape_sql_literal(String text)
-	{
-		return compressQuotes(text.substring(1, text.length()-1),"''");
+	private static String compressQuotes(String paramString1, String paramString2) {
+		String str = paramString1;
+		for (int i = str.indexOf(paramString2); i != -1; i = str.indexOf(paramString2, i + 1))
+			str = str.substring(0, i + 1) + str.substring(i + 2);
+		return str;
 	}
-	
+
+	private static String escape_sql_literal(String text) {
+		return compressQuotes(text.substring(1, text.length() - 1), "''");
+	}
+
 	@Override
 	public ExprAnalyzeResult visitExprLiteral(ExprLiteralContext ctx) {
 		String text = ctx.getText();
@@ -1036,7 +1007,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			text = escape_sql_literal(text);
 
 		}
-		return new ExprAnalyzeResult(StateTransformDefinition.of(), text);
+		return new ExprAnalyzeResult(StateFunc.of(), text);
 
 	}
 
@@ -1048,7 +1019,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		if (e1.getLiteralValue() != null && e2.getLiteralValue() != null) {
 			literalValue = e1.getLiteralValue() + e2.getLiteralValue();
 		}
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()),
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()),
 				literalValue);
 
 	}
@@ -1057,7 +1028,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	public ExprAnalyzeResult visitExpr2poi(Expr2poiContext ctx) {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()));
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
 
 	}
 
@@ -1066,30 +1037,29 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
 		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
-		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation(),
-				e3.getTransformation()));
+		return new ExprAnalyzeResult(
+				StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
 
 	}
 
 	@Override
-	public Object visitSpecial_function1(Special_function1Context ctx) {
-		visitChildren(ctx);
-		exitSpecial_function1(ctx);
-		return null;
+	public ExprAnalyzeResult visitSpecial_function1(Special_function1Context ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
 	}
 
 	@Override
 	public Object visitSpecial_functionSubString(Special_functionSubStringContext ctx) {
-		visitChildren(ctx);
-		exitSpecial_functionSubString(ctx);
-		return null;
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
+		return new ExprAnalyzeResult(
+				StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
 	}
 
 	@Override
 	public Object visitSpecial_functionDateTime(Special_functionDateTimeContext ctx) {
-		visitChildren(ctx);
-		exitSpecial_functionDateTime(ctx);
-		return null;
+		return new ExprAnalyzeResult(StateFunc.of());
 	}
 
 	@Override

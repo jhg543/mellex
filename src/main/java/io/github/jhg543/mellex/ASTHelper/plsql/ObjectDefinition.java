@@ -15,5 +15,9 @@ public class ObjectDefinition {
 	public void setControlBlock(ControlBlock controlBlock) {
 		this.controlBlock = controlBlock;
 	}
+	@Override
+	public String toString() {
+		return "def [" + name + ", cb=" + controlBlock + "]";
+	}
 	
 }
