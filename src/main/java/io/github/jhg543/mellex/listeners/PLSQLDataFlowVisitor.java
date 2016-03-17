@@ -4,13 +4,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
+import com.google.common.escape.Escapers;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
@@ -21,9 +25,11 @@ import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
 import io.github.jhg543.mellex.ASTHelper.UpdateStmt;
 import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ExprAnalyzeResult;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
+import io.github.jhg543.mellex.ASTHelper.plsql.StateTransformDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
@@ -48,6 +54,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprExistsContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprFunctionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprLiteralContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprORContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprObjectContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprSpecialFunctionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Grouping_by_clauseContext;
@@ -99,8 +106,14 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private TableDefinitionProvider provider;
 	private TokenStream stream;
 	private String current_sql;
+	private List<Instruction<VariableUsageState>> instbuffer;
+	private Set<String> unmetFunctionNames;
 
 	private ScopeStack scopeStack;
+
+	private String getText(RuleContext ctx) {
+		return stream.getText(ctx.getSourceInterval());
+	}
 
 	@Override
 	public Object visitCreate_procedure(Create_procedureContext ctx) {
@@ -136,12 +149,19 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public PatchList visitCase_statement(Case_statementContext ctx) {
 		PatchList p = new PatchList();
-		if (ctx.selector!=null)
-		{
-			
+		if (ctx.selector != null && !ctx.selector.inf.isempty()) {
+			Instruction<VariableUsageState> ins = new Instruction<VariableUsageState>();
+			ins.setDebugInfo(ctx.getStart().getLine());
+			Influences inf = ctx.selector.inf;
+			ins.setFunc(state -> {
+				VariableUsageState v = state.shallowCopy();
+
+				return null;
+			});
+			p.setStartInstruction(ins);
 		}
-		
-		return super.visitCase_statement(ctx);
+
+		return null;
 	}
 
 	@Override
@@ -608,38 +628,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		}
 	}
 
-	private void exitExprCase(ExprCaseContext ctx) {
-		Influences cinf = new Influences();
-		for (ExprContext param : ctx.ex) {
-			cinf.addAllInClause(param.inf);
-		}
-		for (ExprContext param : ctx.ax) {
-			cinf.addAll(param.inf);
-		}
-		ctx.inf = cinf;
-	}
-
-	private void exitExprFunction(ExprFunctionContext ctx) {
-		Influences cinf = new Influences();
-		for (ExprContext param : ctx.ex) {
-			cinf.addAll(param.inf);
-		}
-		if (ctx.wx != null) {
-			cinf.addAllInClause(ctx.wx.inf);
-		}
-		ctx.inf = cinf;
-	}
-
-	private void exitExprExists(ExprExistsContext ctx) {
-		Influences cinf = new Influences();
-		if (ctx.isexists != null) {
-			cinf.copySelectStmtAsClause(ctx.ss.q);
-		} else {
-			cinf.copySelectScalar(ctx.ss.q);
-		}
-		ctx.inf = cinf;
-	}
-
 	private void exitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
 		Influences cinf = new Influences();
 		cinf.addAll(ctx.sp.inf);
@@ -653,37 +641,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ctx.inf = cinf;
 	}
 
-	private void exitExpr2(Expr2Context ctx) {
-		Influences cinf = new Influences();
-		cinf.addAll(ctx.operand1.inf);
-		cinf.addAll(ctx.operand2.inf);
-		ctx.inf = cinf;
-	}
-
-	private void exitExpr1(Expr1Context ctx) {
-		Influences cinf = new Influences();
-		ctx.inf = cinf;
-		cinf.addAll(ctx.operand1.inf);
-
-	}
-
 	private void exitExprLiteral(ExprLiteralContext ctx) {
 		Influences cinf = new Influences();
-		ctx.inf = cinf;
-	}
-
-	private void exitExpr2poi(Expr2poiContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addAllInClause(ctx.operand1.inf);
-		cinf.addAllInClause(ctx.operand2.inf);
-		ctx.inf = cinf;
-	}
-
-	private void exitExprBetween(ExprBetweenContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addAllInClause(ctx.operand1.inf);
-		cinf.addAllInClause(ctx.operand2.inf);
-		cinf.addAllInClause(ctx.operand3.inf);
 		ctx.inf = cinf;
 	}
 
@@ -987,24 +946,45 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitExprCase(ExprCaseContext ctx) {
-		visitChildren(ctx);
-		exitExprCase(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprCase(ExprCaseContext ctx) {
+		List<ExprAnalyzeResult> e = new ArrayList<ExprAnalyzeResult>();
+		for (ExprContext param : ctx.ex) {
+			e.add((ExprAnalyzeResult) param.accept(this));
+		}
+		for (ExprContext param : ctx.ax) {
+			e.add((ExprAnalyzeResult) param.accept(this));
+		}
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e.stream().map(ExprAnalyzeResult::getTransformation)
+				.collect(Collectors.toList())));
 	}
 
 	@Override
 	public Object visitExprFunction(ExprFunctionContext ctx) {
-		visitChildren(ctx);
-		exitExprFunction(ctx);
+
+
+//		for (ExprContext param : ctx.ex) {
+//			cinf.addAll(param.inf);
+//		}
+//		if (ctx.wx != null) {
+//			cinf.addAllInClause(ctx.wx.inf);
+//		}
+		FunctionDefinition fndef = null;
+		
+		if (ctx.function_name() != null) {
+			String fn = ctx.function_name().getText();
+			fndef = scopeStack.searchByName(fn, FunctionDefinition.class);
+			if ( fndef == null) {
+				unmetFunctionNames.add(fn);
+			}
+		}
+		
 		return null;
 	}
 
 	@Override
-	public Object visitExprExists(ExprExistsContext ctx) {
-		visitChildren(ctx);
-		exitExprExists(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprExists(ExprExistsContext ctx) {
+		StateTransformDefinition ss = (StateTransformDefinition) ctx.ss.accept(this);
+		return new ExprAnalyzeResult(ss);
 	}
 
 	@Override
@@ -1022,38 +1002,73 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitExpr2(Expr2Context ctx) {
-		visitChildren(ctx);
-		exitExpr2(ctx);
-		return null;
+	public ExprAnalyzeResult visitExpr2(Expr2Context ctx) {
+
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()));
+
 	}
 
 	@Override
-	public Object visitExpr1(Expr1Context ctx) {
-		visitChildren(ctx);
-		exitExpr1(ctx);
-		return null;
+	public ExprAnalyzeResult visitExpr1(Expr1Context ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e.getTransformation()));
+	}
+
+	private static String compressQuotes(String paramString1, String paramString2)
+	  {
+	    String str = paramString1;
+	    for (int i = str.indexOf(paramString2); i != -1; i = str.indexOf(paramString2, i + 1))
+	      str = str.substring(0, i + 1) + str.substring(i + 2);
+	    return str;
+     }
+
+	private static String escape_sql_literal(String text)
+	{
+		return compressQuotes(text.substring(1, text.length()-1),"''");
+	}
+	
+	@Override
+	public ExprAnalyzeResult visitExprLiteral(ExprLiteralContext ctx) {
+		String text = ctx.getText();
+		if (ctx.literal_value().STRING_LITERAL() != null) {
+			text = escape_sql_literal(text);
+
+		}
+		return new ExprAnalyzeResult(StateTransformDefinition.of(), text);
+
 	}
 
 	@Override
-	public Object visitExprLiteral(ExprLiteralContext ctx) {
-		visitChildren(ctx);
-		exitExprLiteral(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprOR(ExprORContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		String literalValue = null;
+		if (e1.getLiteralValue() != null && e2.getLiteralValue() != null) {
+			literalValue = e1.getLiteralValue() + e2.getLiteralValue();
+		}
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()),
+				literalValue);
+
 	}
 
 	@Override
-	public Object visitExpr2poi(Expr2poiContext ctx) {
-		visitChildren(ctx);
-		exitExpr2poi(ctx);
-		return null;
+	public ExprAnalyzeResult visitExpr2poi(Expr2poiContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation()));
+
 	}
 
 	@Override
-	public Object visitExprBetween(ExprBetweenContext ctx) {
-		visitChildren(ctx);
-		exitExprBetween(ctx);
-		return null;
+	public ExprAnalyzeResult visitExprBetween(ExprBetweenContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
+		return new ExprAnalyzeResult(StateTransformDefinition.combine(e1.getTransformation(), e2.getTransformation(),
+				e3.getTransformation()));
+
 	}
 
 	@Override

@@ -5,6 +5,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class  Instruction<S> {
+	private Object debugInfo;
+	
 	private Function<S,S> func;
 	private Collection<Supplier<Instruction<S>>> nextPc;
 	
@@ -21,6 +23,13 @@ public class  Instruction<S> {
 	public void setNextPc(Collection<Supplier<Instruction<S>>> nextPc) {
 		this.nextPc = nextPc;
 	}
+	public Object getDebugInfo() {
+		return debugInfo;
+	}
+	public void setDebugInfo(Object debugInfo) {
+		this.debugInfo = debugInfo;
+	}
+	
 	
 	
 	

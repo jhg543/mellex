@@ -774,7 +774,7 @@ returns [ Influences inf , ObjectName objname ]
 // | BIND_PARAMETER
 
  | unary_operator operand1=expr /*unary*/  #expr1
- | operand1=expr '||' operand2=expr /*arithmetic*/  #expr2
+ | operand1=expr '||' operand2=expr /*arithmetic*/  #exprOR
  | operand1=expr '*' '*' operand2=expr /*arithmetic*/  #expr2
  | operand1=expr ( '*' | '/' | K_MOD ) operand2=expr /*arithmetic*/  #expr2
  | operand1=expr ( '+' | '-' ) operand2=expr /*arithmetic*/  #expr2

@@ -69,5 +69,13 @@ public class VariableUsageState {
 	}
 	
 	
+	public VariableUsageState shallowCopy()
+	{
+		VariableUsageState s = new VariableUsageState();
+		s.branchCondUsage = this.branchCondUsage;
+		s.globalObjectUsage = this.globalObjectUsage;
+		s.variableUsage = this.variableUsage;
+		return s;
+	}
 	
 }

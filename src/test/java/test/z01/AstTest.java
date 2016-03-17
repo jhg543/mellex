@@ -57,3 +57,10 @@ public class AstTest {
 
 	}
 }
+/*
+ * expr
+ * function
+ * select
+ * insert/update
+ * assign
+ */

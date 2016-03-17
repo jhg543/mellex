@@ -8,34 +8,23 @@ import java.util.Set;
 
 public class FunctionDefinition extends ObjectDefinition {
 	
-	List<VariableDefinition> parameters;
-	private HashMap<String, Set<InfSource>> globalObjectUsage;
-	private Set<InfSource> branchCondUsage;
-	private Set<InfSource> returnValueUsage;
+	private List<VariableDefinition> parameters;
+	
+	private StateTransformDefinition definition;
+	
 	public List<VariableDefinition> getParameters() {
 		return parameters;
 	}
 	public void setParameters(List<VariableDefinition> parameters) {
 		this.parameters = parameters;
 	}
-	public HashMap<String, Set<InfSource>> getGlobalObjectUsage() {
-		return globalObjectUsage;
+	public StateTransformDefinition getDefinition() {
+		return definition;
 	}
-	public void setGlobalObjectUsage(HashMap<String, Set<InfSource>> globalObjectUsage) {
-		this.globalObjectUsage = globalObjectUsage;
+	public void setDefinition(StateTransformDefinition definition) {
+		this.definition = definition;
 	}
-	public Set<InfSource> getBranchCondUsage() {
-		return branchCondUsage;
-	}
-	public void setBranchCondUsage(Set<InfSource> branchCondUsage) {
-		this.branchCondUsage = branchCondUsage;
-	}
-	public Set<InfSource> getReturnValueUsage() {
-		return returnValueUsage;
-	}
-	public void setReturnValueUsage(Set<InfSource> returnValueUsage) {
-		this.returnValueUsage = returnValueUsage;
-	}
+	
 	
 	
 }
