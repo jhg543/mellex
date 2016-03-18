@@ -64,5 +64,10 @@ public class ValueFunc {
 		v.parameters = ImmutableSet.copyOf(variableReference);
 		return v;
 	}
+
+	@Override
+	public String toString() {
+		return "ValueFunc [objects=" + objects + ", parameters=" + parameters + "]";
+	}
 	
 }

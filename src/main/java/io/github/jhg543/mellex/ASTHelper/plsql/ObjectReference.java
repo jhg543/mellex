@@ -6,7 +6,7 @@ public class ObjectReference {
 	private ObjectDefinition objectDefinition;
 	private int lineNumber;
 	private int charPosition;
-	private String fileName;
+	private String fileName ="";
 	
 	public ObjectDefinition getObjectDefinition() {
 		return objectDefinition;
@@ -66,6 +66,11 @@ public class ObjectReference {
 		} else if (!objectDefinition.equals(other.objectDefinition))
 			return false;
 		return true;
+	}
+	@Override
+	public String toString() {
+		return "Ref [def=" + objectDefinition + ", pos=" + lineNumber + ","
+				+ charPosition + ", f=" + fileName + "]";
 	}
 	
 	

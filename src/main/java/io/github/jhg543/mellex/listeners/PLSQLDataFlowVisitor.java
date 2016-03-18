@@ -111,7 +111,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private String current_sql;
 	private String fileID;
 	private List<Instruction<VariableUsageState>> instbuffer;
-	private Set<String> unmetFunctionNames;
 
 	private ScopeStack scopeStack;
 
@@ -869,7 +868,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitSelect_stmt(Select_stmtContext ctx) {
+	public StateFunc visitSelect_stmt(Select_stmtContext ctx) {
 		visitChildren(ctx);
 		exitSelect_stmt(ctx);
 		return null;
@@ -919,30 +918,39 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		for (ExprContext param : ctx.ax) {
 			e.add((ExprAnalyzeResult) param.accept(this));
 		}
-		return new ExprAnalyzeResult(StateFunc
-				.combine(e.stream().map(ExprAnalyzeResult::getTransformation).collect(Collectors.toList())));
+		return new ExprAnalyzeResult(
+				StateFunc.combine(e.stream().map(ExprAnalyzeResult::getTransformation).collect(Collectors.toList())));
 	}
 
 	@Override
-	public Object visitExprFunction(ExprFunctionContext ctx) {
+	public ExprAnalyzeResult visitExprFunction(ExprFunctionContext ctx) {
 
-		// for (ExprContext param : ctx.ex) {
-		// cinf.addAll(param.inf);
-		// }
-		// if (ctx.wx != null) {
-		// cinf.addAllInClause(ctx.wx.inf);
-		// }
 		FunctionDefinition fndef = null;
 
 		if (ctx.function_name() != null) {
 			String fn = ctx.function_name().getText();
 			fndef = scopeStack.searchByName(fn, FunctionDefinition.class);
-			if (fndef == null) {
-				unmetFunctionNames.add(fn);
-			}
 		}
 
-		return null;
+		if (fndef == null) {
+			fndef = FunctionDefinition.unknownFunction(ctx.ex.size());
+		}
+
+		List<StateFunc> params = new ArrayList<>();
+		for (ExprContext param : ctx.ex) {
+			ExprAnalyzeResult e = (ExprAnalyzeResult) param.accept(this);
+			params.add(e.getTransformation());
+		}
+
+		StateFunc fs = fndef.apply(params);
+
+		if (ctx.wx == null) {
+			return new ExprAnalyzeResult(fs);
+		} else {
+			StateFunc windowsexpr = (StateFunc) ctx.wx.accept(this);
+			return new ExprAnalyzeResult(StateFunc.combine(fs, windowsexpr));
+		}
+
 	}
 
 	@Override
@@ -959,7 +967,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
 		String name = ctx.getText();
-		ObjectDefinition def = scopeStack.searchByName(name);
+		Object def = scopeStack.searchByName(name);
 
 		if (def instanceof ColumnDefinition) {
 			ObjectReference r = new ObjectReference();
@@ -968,7 +976,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			r.setFileName(fileID);
 			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
 		} else if (def instanceof VariableDefinition) {
-			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(def)), name);
+			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)), name);
+		} else if (def instanceof ExprAnalyzeResult) {
+			return (ExprAnalyzeResult) def;
 		} else {
 			throw new RuntimeException("Unexpected ObjectDefinition type" + def.getClass().toString());
 		}
@@ -1019,8 +1029,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		if (e1.getLiteralValue() != null && e2.getLiteralValue() != null) {
 			literalValue = e1.getLiteralValue() + e2.getLiteralValue();
 		}
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()),
-				literalValue);
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()), literalValue);
 
 	}
 
@@ -1037,8 +1046,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
 		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
-		return new ExprAnalyzeResult(
-				StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
 
 	}
 
@@ -1053,8 +1061,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
 		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
-		return new ExprAnalyzeResult(
-				StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
 	}
 
 	@Override
@@ -1070,10 +1077,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitOrdering_term_window(Ordering_term_windowContext ctx) {
-		visitChildren(ctx);
-		exitOrdering_term_window(ctx);
-		return null;
+	public StateFunc visitOrdering_term_window(Ordering_term_windowContext ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		return e.getTransformation();
 	}
 
 	@Override
@@ -1168,10 +1174,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitWindow(WindowContext ctx) {
-		visitChildren(ctx);
-		exitWindow(ctx);
-		return null;
+	public StateFunc visitWindow(WindowContext ctx) {
+		List<StateFunc> s = new ArrayList<>();
+		for (ExprContext p : ctx.ex) {
+			ExprAnalyzeResult e = (ExprAnalyzeResult) p.accept(this);
+			s.add(e.getTransformation());
+		}
+		for (Ordering_term_windowContext p : ctx.ox) {
+			s.add((StateFunc) p.accept(this));
+		}
+		return StateFunc.combine(s);
 	}
 }
 

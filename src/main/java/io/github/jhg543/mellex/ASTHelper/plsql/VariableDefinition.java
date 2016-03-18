@@ -31,5 +31,9 @@ public class VariableDefinition extends ObjectDefinition {
 	public void setConst(boolean isConst) {
 		this.isConst = isConst;
 	}
+	@Override
+	public String toString() {
+		return "Vdef [" + getName() + "]";
+	}
 	
 }

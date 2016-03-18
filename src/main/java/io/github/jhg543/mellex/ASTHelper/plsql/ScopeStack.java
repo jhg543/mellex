@@ -9,10 +9,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 public class ScopeStack {
 	public ControlBlock ROOT = new ControlBlock();
 
+	private Set<String> unmetFunctionNames;
+	
 	private Deque<ControlBlock> stack;
 
 	private Map<String, ObjectDefinition> cache;
@@ -62,7 +65,23 @@ public class ScopeStack {
 		cache.clear();
 		return c;
 	}
-
+	
+	public FunctionDefinition searchFunction(String name)
+	{
+		FunctionDefinition d = searchFunction0(name);
+		if (d!=null)
+		{
+			return d;
+		}
+		unmetFunctionNames.add(name);
+		return null;
+	}
+	
+	public FunctionDefinition searchFunction0(String name)
+	{
+		return null;
+	}
+	
 	public <T extends ObjectDefinition> T searchByName(String s, Class<T> expectedClass) {
 		ObjectDefinition v = cache.get(s);
 		if (v != null) {
@@ -81,7 +100,7 @@ public class ScopeStack {
 		return null;
 	}
 	
-	public ObjectDefinition searchByName(String s)
+	public Object searchByName(String s)
 	{
 		//TODO implement here
 		return null;
