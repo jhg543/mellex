@@ -639,11 +639,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ctx.objname = name;
 	}
 
-	private void exitOrdering_term_window(Ordering_term_windowContext ctx) {
-		Influences cinf = new Influences();
-		cinf.addAllInClause(ctx.operand1.inf);
-		ctx.inf = cinf;
-	}
 
 	private void exitCommon_table_expression(Common_table_expressionContext ctx) {
 		ctx.q = new SubQuery();
@@ -848,17 +843,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		inf.addAllInClause(ctx.ex.inf);
 	}
 
-	private void exitWindow(WindowContext ctx) {
-		Influences inf = new Influences();
-		ctx.inf = inf;
-		for (int i = 0; i < ctx.ex.size(); ++i) {
-			inf.addAllInClause(ctx.ex.get(i).inf);
-		}
-		for (int i = 0; i < ctx.ox.size(); ++i) {
-			inf.addAllInClause(ctx.ox.get(i).inf);
-		}
-
-	}
 
 	@Override
 	public Object visitInsert_stmt(Insert_stmtContext ctx) {

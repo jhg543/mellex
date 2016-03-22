@@ -25,7 +25,7 @@ import static java.util.stream.Collectors.*;
 public class StateFunc {
 	protected ValueFunc value;
 	protected Map<ObjectDefinition, ValueFunc> updates;
-	protected Map<ObjectDefinition, ValueFunc> assigns;
+	protected Map<ObjectDefinition, ValueFunc> assigns; // should be ordered map since used in result column
 	protected ValueFunc branchCond;	
 	
 	public ValueFunc getValue() {
