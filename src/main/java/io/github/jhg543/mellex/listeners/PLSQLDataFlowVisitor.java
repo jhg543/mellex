@@ -1,20 +1,14 @@
 package io.github.jhg543.mellex.listeners;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.RuleNode;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
-import com.google.common.escape.Escapers;
 
 import io.github.jhg543.mellex.ASTHelper.CreateTableStmt;
 import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
@@ -263,18 +257,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		// COPY FROM visitParameter_declaration
 
 		VariableDefinition def = new VariableDefinition();
-		def.setMods(new ArrayList<>(2));
 		def.setName(ctx.any_name().getText());
-		def.setConst(ctx.K_CONSTANT() != null);
+		//def.setConst(ctx.K_CONSTANT() != null);
 		ExprContext exprContext = ctx.expr();
 		if (exprContext != null) {
-			exprContext.accept(this);
-			VariableModification vm = new VariableModification();
-			ResultColumn scalar = new ResultColumn();
-			scalar.inf = exprContext.inf;
-			vm.columns.add(scalar);
-			def.setDefaultValue(vm);
+			// TODO deal with expr
 		}
+		
 		return def;
 	}
 
@@ -293,16 +282,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
 		}
 		VariableDefinition def = new VariableDefinition();
-		def.setMods(new ArrayList<>(2));
 		def.setName(ctx.any_name().getText());
 		ExprContext exprContext = ctx.expr();
 		if (exprContext != null) {
-			exprContext.accept(this);
-			VariableModification vm = new VariableModification();
-			ResultColumn scalar = new ResultColumn();
-			scalar.inf = exprContext.inf;
-			vm.columns.add(scalar);
-			def.setDefaultValue(vm);
+			// TODO deal with expr
 		}
 		return def;
 	}
