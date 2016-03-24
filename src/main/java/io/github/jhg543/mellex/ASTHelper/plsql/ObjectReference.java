@@ -1,37 +1,44 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-
 public class ObjectReference {
-	
+
 	private ObjectDefinition objectDefinition;
 	private int lineNumber;
 	private int charPosition;
-	private String fileName ="";
-	
+	private String fileName = "";
+
 	public ObjectDefinition getObjectDefinition() {
 		return objectDefinition;
 	}
+
 	public void setObjectDefinition(ObjectDefinition objectDefinition) {
 		this.objectDefinition = objectDefinition;
 	}
+
 	public int getLineNumber() {
 		return lineNumber;
 	}
+
 	public void setLineNumber(int lineNumber) {
 		this.lineNumber = lineNumber;
 	}
+
 	public int getCharPosition() {
 		return charPosition;
 	}
+
 	public void setCharPosition(int charPosition) {
 		this.charPosition = charPosition;
 	}
+
 	public String getFileName() {
 		return fileName;
 	}
+
 	public void setFileName(String fileName) {
 		this.fileName = fileName;
 	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -42,6 +49,7 @@ public class ObjectReference {
 		result = prime * result + ((objectDefinition == null) ? 0 : objectDefinition.hashCode());
 		return result;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -67,11 +75,18 @@ public class ObjectReference {
 			return false;
 		return true;
 	}
+
 	@Override
 	public String toString() {
-		return "Ref [def=" + objectDefinition + ", pos=" + lineNumber + ","
-				+ charPosition + ", f=" + fileName + "]";
+		return "Ref [def=" + objectDefinition + ", pos=" + lineNumber + "," + charPosition + ", f=" + fileName + "]";
 	}
-	
-	
+
+	public ObjectReference(ObjectDefinition objectDefinition, String fileName, int lineNumber, int charPosition) {
+		super();
+		this.objectDefinition = objectDefinition;
+		this.lineNumber = lineNumber;
+		this.charPosition = charPosition;
+		this.fileName = fileName;
+	}
+
 }

@@ -101,4 +101,12 @@ public class NameResolver {
 		}
 		return tempResult;
 	}
+
+	public void addFromTable(String tableName, String alias) {
+		this.alias.addFromTable(tableName, alias);
+	}
+
+	public void addFromSubQuery(String alias, SelectStmtData subquery) {
+		this.alias.addFromSubQuery(alias, subquery);
+	}
 }

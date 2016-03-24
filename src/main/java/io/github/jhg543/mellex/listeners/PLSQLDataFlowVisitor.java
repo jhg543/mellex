@@ -25,10 +25,12 @@ import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
 import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
+import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
+import io.github.jhg543.mellex.ASTHelper.symbol.NameResolver;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Any_nameContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Case_statementContext;
@@ -96,11 +98,13 @@ import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
 import io.github.jhg543.mellex.listeners.flowmfp.PatchList;
 import io.github.jhg543.mellex.listeners.flowmfp.VariableUsageState;
 import io.github.jhg543.mellex.util.Misc;
+import io.github.jhg543.mellex.util.tuple.Tuple2;
 
 @SuppressWarnings("unchecked")
 public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	private TableDefinitionProvider provider;
+	private NameResolver nameResolver;
 	private TokenStream stream;
 	private String current_sql;
 	private String fileID;
@@ -258,12 +262,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		VariableDefinition def = new VariableDefinition();
 		def.setName(ctx.any_name().getText());
-		//def.setConst(ctx.K_CONSTANT() != null);
+		// def.setConst(ctx.K_CONSTANT() != null);
 		ExprContext exprContext = ctx.expr();
 		if (exprContext != null) {
 			// TODO deal with expr
 		}
-		
+
 		return def;
 	}
 
@@ -297,9 +301,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		return null;
 	}
 
-	public PLSQLDataFlowVisitor(TableDefinitionProvider provider, TokenStream stream) {
+	public PLSQLDataFlowVisitor(TokenStream stream) {
 		super();
-		this.provider = provider;
+
 		this.stream = stream;
 	}
 
@@ -622,7 +626,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		ctx.objname = name;
 	}
 
-
 	private void exitCommon_table_expression(Common_table_expressionContext ctx) {
 		ctx.q = new SubQuery();
 		ctx.q.copyRC(ctx.ss.q);
@@ -826,7 +829,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		inf.addAllInClause(ctx.ex.inf);
 	}
 
-
 	@Override
 	public Object visitInsert_stmt(Insert_stmtContext ctx) {
 		visitChildren(ctx);
@@ -835,7 +837,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public StateFunc visitSelect_stmt(Select_stmtContext ctx) {
+	public SelectStmtData visitSelect_stmt(Select_stmtContext ctx) {
 		visitChildren(ctx);
 		exitSelect_stmt(ctx);
 		return null;
@@ -1057,51 +1059,79 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
+	public List<Tuple2<String,StateFunc>> visitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
 		visitChildren(ctx);
 		exitResult_columnAsterisk(ctx);
 		return null;
 	}
 
 	@Override
-	public Object visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
+	public List<Tuple2<String,StateFunc>> visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
+		String tableName = ctx.tn.getText();
+		
 		visitChildren(ctx);
 		exitResult_columnTableAsterisk(ctx);
 		return null;
 	}
 
 	@Override
-	public Object visitResult_columnExpr(Result_columnExprContext ctx) {
-		visitChildren(ctx);
-		exitResult_columnExpr(ctx);
-		return null;
+	public List<Tuple2<String,StateFunc>> visitResult_columnExpr(Result_columnExprContext ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.ex.accept(this);
+		String alias = null;
+		if (ctx.ca!=null)
+		{
+			alias = ctx.ca.getText();
+		}
+		return Collections.singletonList(Tuple2.of(alias, e.getTransformation()));
 	}
 
 	@Override
-	public Object visitTable_or_subqueryTable(Table_or_subqueryTableContext ctx) {
-		visitChildren(ctx);
-		exitTable_or_subqueryTable(ctx);
-		return null;
+	public String visitTable_or_subqueryTable(Table_or_subqueryTableContext ctx) {
+		String tableName = ctx.tn.getText();
+		if (ctx.dn != null) {
+			tableName = ctx.dn.getText() + tableName;
+		}
+		String alias = null;
+		if (ctx.ta != null) {
+			alias = ctx.ta.getText();
+		}
+
+		nameResolver.addFromTable(tableName, alias);
+		return tableName;
 	}
 
 	@Override
-	public Object visitTable_or_subquerySubQuery(Table_or_subquerySubQueryContext ctx) {
-		visitChildren(ctx);
-		exitTable_or_subquerySubQuery(ctx);
-		return null;
+	public String visitTable_or_subquerySubQuery(Table_or_subquerySubQueryContext ctx) {
+		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
+		String alias = ctx.ta.getText();
+		nameResolver.addFromSubQuery(alias, ss);
+		return alias;
 	}
 
 	@Override
 	public Object visitJoin_clause(Join_clauseContext ctx) {
-		visitChildren(ctx);
-		exitJoin_clause(ctx);
+		// used directly by parent
 		return null;
 	}
 
 	@Override
 	public Object visitSelect_core(Select_coreContext ctx) {
-		visitChildren(ctx);
-		exitSelect_core(ctx);
+		// visitChildren(ctx);
+		// exitSelect_core(ctx);
+		// return null;
+		nameResolver.enterSelectStmt(ctx);
+
+		if (ctx.jc != null) {
+			// visit all Table or subquery to construct name resolver
+			for (Table_or_subqueryContext sub:ctx.jc.ts)
+			{
+				sub.accept(this);
+			}
+		}
+
+		
+		
+		nameResolver.exitSelectStmt(ctx);
 		return null;
 	}
 

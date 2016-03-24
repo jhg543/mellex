@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Preconditions;
@@ -15,9 +17,11 @@ import com.google.common.base.Splitter;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
 import io.github.jhg543.mellex.util.tuple.Tuple3;
 
@@ -66,24 +70,66 @@ public class AliasColumnResolver {
 		Preconditions.checkState(expectedScopeId == this.scopes.pop().getId(), "popped scope is not as expected");
 	}
 
-	public void addTable(String tableName) {
+	public void addFromTable(String tableName, String alias) {
 		// with ctetable1 as ... select * from ctetable1;
 		if (cte.containsKey(tableName)) {
 			return;
 		}
-		scopes.peek().getLiveTables().put(tableName, tableResolver.apply(tableName));
+		scopes.peek().getLiveTables().put(alias == null ? tableName : alias, tableResolver.apply(tableName));
 		// select * from sometable
 
 	}
 
-	public void addTable(String tableName, String alias) {
-		// with ctetable1 as ... select * from ctetable1;
-		if (cte.containsKey(tableName)) {
-			return;
-		}
-		scopes.peek().getLiveTables().put(alias, tableResolver.apply(tableName));
-		// select * from sometable
+	public void addFromSubQuery(String alias, SelectStmtData subquery) {
+		scopes.peek().getSubqueries().put(alias, subquery);
+	}
 
+	public List<Tuple2<String, StateFunc>> wildCardAll(String fileName, int lineNumber, int charPosition) {
+		Scope s = scopes.peek();
+		Stream<Tuple2<String, StateFunc>> a = s.subqueries.entrySet().stream().flatMap(
+				
+				es->
+				
+				es.getValue().getColumns().entrySet().stream()
+				.map(
+						e -> Tuple2.of(es.getKey()+"."+e.getKey(), e.getValue())
+						)
+				);
+		
+		Stream<Tuple2<String, StateFunc>> b =  s.getLiveTables().entrySet().stream().flatMap(
+				
+				es->
+				
+				es.getValue().getColumns().entrySet().stream()
+				.map(e -> Tuple2.of(es.getKey()+"."+e.getKey(),
+						StateFunc.ofValue(
+								ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
+				);
+		return Stream.concat(a, b).collect(Collectors.toList());
+	}
+
+	public List<Tuple2<String, StateFunc>> wildCardOneTable(String tableName, String fileName, int lineNumber,
+			int charPosition) {
+		Scope s = scopes.peek();
+		SelectStmtData ss = s.subqueries.get(tableName);
+		if (ss != null) {
+			// TODO does order important in "*"?
+			return ss.getColumns().entrySet().stream().map(e -> Tuple2.of(tableName+"."+e.getKey(), e.getValue()))
+					.collect(Collectors.toList());
+		}
+
+		TableDefinition td = s.liveTables.get(tableName);
+
+		// TODO if td def not exist?
+		if (td != null) {
+			return td.getColumns().entrySet().stream()
+					.map(e -> Tuple2.of(tableName+"."+e.getKey(),
+							StateFunc.ofValue(
+									ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
+					.collect(Collectors.toList());
+		}
+
+		throw new RuntimeException("Table " + tableName + " not found");
 	}
 
 	private SelectStmtData searchSubqueryOrCte(String alias) {
