@@ -16,7 +16,7 @@ import com.google.common.collect.ImmutableSet;
 import static java.util.stream.Collectors.*;
 
 /**
- * variable value in a expression should not change. for example -- f(out x, y,
+ *  value of variable in a expression should not change. for example -- f(out x, y,
  * z) is { x:=x+y+z; return y;} expr := f(v1,v2,v3) --- OK { v = {v2} , a = { v1
  * := {v1,v2,v3} }} expr := f(v1,v2,v3) + v1 --- NO SUPPORT program result = { v
  * = { v1,v2 } v1:= {v1,v2,v3} } WRONG ANSWER
@@ -25,9 +25,11 @@ import static java.util.stream.Collectors.*;
 public class StateFunc {
 	protected ValueFunc value;
 	protected Map<ObjectDefinition, ValueFunc> updates;
-	protected Map<ObjectDefinition, ValueFunc> assigns; // should be ordered map since used in result column
-	protected ValueFunc branchCond;	
-	
+	protected Map<ObjectDefinition, ValueFunc> assigns; // should be ordered map
+														// since used in result
+														// column
+	protected ValueFunc branchCond;
+
 	public ValueFunc getValue() {
 		return value;
 	}
@@ -54,6 +56,11 @@ public class StateFunc {
 
 		if (subs.size() == 0) {
 			return ValueFunc.of();
+		}
+		for (int i = subs.size() - 1; i > 0; --i) {
+			if (subs.get(0) == subs.get(i)) {
+				subs.remove(i);
+			}
 		}
 		if (subs.size() == 1) {
 			return subs.get(0);
@@ -198,21 +205,18 @@ public class StateFunc {
 			if (v != e.getValue()) {
 				nochange = false;
 			}
-			// f(a,out b) = { b = a+b }  --> assigns = b: a,b   f(x,y) --->   x:x,y
-			if (parameterValues.containsKey(e.getKey()))
-			{
+			// f(a,out b) = { b = a+b } --> assigns = b: a,b f(x,y) ---> x:x,y
+			if (parameterValues.containsKey(e.getKey())) {
 				StateFunc lvalue = parameterValues.get(e.getKey());
 				nochange = false;
 				// TODO check it is a lvalue
 				Preconditions.checkState(lvalue.assigns.isEmpty());
-				Preconditions.checkState( lvalue.updates.isEmpty());
-				Preconditions.checkState( lvalue.value.getObjects().isEmpty());
-				Preconditions.checkState( lvalue.value.getParameters().size() ==1);
-				as.put(lvalue.getValue().getParameters().iterator().next(),v);
-				
-			}
-			else
-			{
+				Preconditions.checkState(lvalue.updates.isEmpty());
+				Preconditions.checkState(lvalue.value.getObjects().isEmpty());
+				Preconditions.checkState(lvalue.value.getParameters().size() == 1);
+				as.put(lvalue.getValue().getParameters().iterator().next(), v);
+
+			} else {
 				as.put(e.getKey(), v);
 			}
 
@@ -245,6 +249,5 @@ public class StateFunc {
 		return "StateFunc [value=" + value + ", updates=" + updates + ", assigns=" + assigns + ", branchCond=" + branchCond
 				+ "]";
 	}
-	
-	
+
 }

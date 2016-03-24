@@ -76,7 +76,7 @@ public class AliasColumnResolver {
 
 	}
 
-	public void addTable(String tableName,String alias) {
+	public void addTable(String tableName, String alias) {
 		// with ctetable1 as ... select * from ctetable1;
 		if (cte.containsKey(tableName)) {
 			return;
@@ -85,7 +85,7 @@ public class AliasColumnResolver {
 		// select * from sometable
 
 	}
-	
+
 	private SelectStmtData searchSubqueryOrCte(String alias) {
 
 		for (Scope s : scopes) {
@@ -138,6 +138,9 @@ public class AliasColumnResolver {
 	}
 
 	public Tuple2<ObjectDefinition, StateFunc> searchByName(String name) {
+		if (scopes.isEmpty() && cte.isEmpty()) {
+			return null;
+		}
 		List<String> namedotsplit = dotsplitter.splitToList(name);
 		if (namedotsplit.size() == 2) {
 			String tableName = namedotsplit.get(0);
@@ -161,6 +164,23 @@ public class AliasColumnResolver {
 			return null;
 		}
 
+	}
+
+	public ObjectDefinition guessColumn(String name) {
+		if (scopes.isEmpty()) {
+			return null;
+		}
+		Scope s = scopes.peek();
+		if (s.getSubqueries().size() == 0 && s.getLiveTables().size() == 1) {
+			Entry<String, TableDefinition> e = s.getLiveTables().entrySet().iterator().next();
+			ColumnDefinition cd = new ColumnDefinition();
+			cd.setInfered(true);
+			cd.setName(e.getKey());
+			e.getValue().getColumns().put(e.getKey(), cd);
+			return cd;
+		} else {
+			return null;
+		}
 	}
 
 	private static class Scope {
