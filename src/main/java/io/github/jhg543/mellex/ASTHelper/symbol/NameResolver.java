@@ -1,9 +1,13 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
+import java.util.List;
+
 import com.google.common.base.Preconditions;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
+import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.util.DatabaseVendor;
+import io.github.jhg543.mellex.util.tuple.Tuple2;
 
 public class NameResolver {
 	private AliasColumnResolver alias;
@@ -51,6 +55,15 @@ public class NameResolver {
 		return null;
 	}
 
+	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {
+		return alias.wildCardAll(fileName, lineNumber, charPosition);
+	}
+
+	public List<Tuple2<String, StateFunc>> searchWildcardOneTable(String tableName, String fileName, int lineNumber,
+			int charPosition) {
+		return alias.wildCardOneTable(tableName, fileName, lineNumber, charPosition);
+	}
+
 	public void enterFunctionDefinition(Object funcid) {
 		local.pushScope(funcid, false);
 	}
@@ -95,6 +108,11 @@ public class NameResolver {
 		}
 	}
 
+	public void collectResultColumnAlias(List<String> aliasList){
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			ors.collectResultColumnAlias(aliasList);
+		}
+	}
 	public SelectStmtData rewriteAfterResultColumns(SelectStmtData tempResult) {
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			return ors.rewriteStateFunc(tempResult);

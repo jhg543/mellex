@@ -87,21 +87,17 @@ public class AliasColumnResolver {
 	public List<Tuple2<String, StateFunc>> wildCardAll(String fileName, int lineNumber, int charPosition) {
 		Scope s = scopes.peek();
 		Stream<Tuple2<String, StateFunc>> a = s.subqueries.entrySet().stream().flatMap(
-				
 				es->
-				
-				es.getValue().getColumns().entrySet().stream()
+				es.getValue().getColumns().stream()
 				.map(
-						e -> Tuple2.of(es.getKey()+"."+e.getKey(), e.getValue())
+						rc -> Tuple2.of(rc.getName(), rc.getExpr())
 						)
 				);
 		
 		Stream<Tuple2<String, StateFunc>> b =  s.getLiveTables().entrySet().stream().flatMap(
-				
 				es->
-				
 				es.getValue().getColumns().entrySet().stream()
-				.map(e -> Tuple2.of(es.getKey()+"."+e.getKey(),
+				.map(e -> Tuple2.of(e.getKey(),
 						StateFunc.ofValue(
 								ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
 				);
@@ -114,7 +110,7 @@ public class AliasColumnResolver {
 		SelectStmtData ss = s.subqueries.get(tableName);
 		if (ss != null) {
 			// TODO does order important in "*"?
-			return ss.getColumns().entrySet().stream().map(e -> Tuple2.of(tableName+"."+e.getKey(), e.getValue()))
+			return ss.getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr()))
 					.collect(Collectors.toList());
 		}
 
@@ -123,7 +119,7 @@ public class AliasColumnResolver {
 		// TODO if td def not exist?
 		if (td != null) {
 			return td.getColumns().entrySet().stream()
-					.map(e -> Tuple2.of(tableName+"."+e.getKey(),
+					.map(e -> Tuple2.of(e.getKey(),
 							StateFunc.ofValue(
 									ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
 					.collect(Collectors.toList());
@@ -153,7 +149,7 @@ public class AliasColumnResolver {
 
 		for (Scope s : scopes) {
 			for (Entry<String, SelectStmtData> e : s.getSubqueries().entrySet()) {
-				StateFunc fc = e.getValue().getColumns().get(name);
+				StateFunc fc = e.getValue().getColumnExprFunc(name);
 				if (fc != null) {
 					if (result != null) {
 						throw new IllegalStateException(
@@ -193,7 +189,7 @@ public class AliasColumnResolver {
 			SelectStmtData ss = searchSubqueryOrCte(tableName);
 			if (ss != null) {
 				String columnName = namedotsplit.get(1);
-				StateFunc inf = ss.getColumns().get(columnName);
+				StateFunc inf = ss.getColumnExprFunc(columnName);
 				Preconditions.checkState(inf != null, "No column %s found in Subquery %s", columnName, tableName);
 				return Tuple2.of(null, inf);
 			} else {

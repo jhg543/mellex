@@ -10,16 +10,17 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import static java.util.stream.Collectors.*;
 
 /**
- *  value of variable in a expression should not change. for example -- f(out x, y,
- * z) is { x:=x+y+z; return y;} expr := f(v1,v2,v3) --- OK { v = {v2} , a = { v1
- * := {v1,v2,v3} }} expr := f(v1,v2,v3) + v1 --- NO SUPPORT program result = { v
- * = { v1,v2 } v1:= {v1,v2,v3} } WRONG ANSWER
+ * value of variable in a expression should not change. for example -- f(out x,
+ * y, z) is { x:=x+y+z; return y;} expr := f(v1,v2,v3) --- OK { v = {v2} , a = {
+ * v1 := {v1,v2,v3} }} expr := f(v1,v2,v3) + v1 --- NO SUPPORT program result =
+ * { v = { v1,v2 } v1:= {v1,v2,v3} } WRONG ANSWER
  *
  */
 public class StateFunc {
@@ -28,6 +29,11 @@ public class StateFunc {
 	protected Map<ObjectDefinition, ValueFunc> assigns; // should be ordered map
 														// since used in result
 														// column
+	/**
+	 * For Select it's where having order.... clause For expr it's only come
+	 * from inline select stmt For Function def it's
+	 * 
+	 */
 	protected ValueFunc branchCond;
 
 	public ValueFunc getValue() {
@@ -230,8 +236,11 @@ public class StateFunc {
 	}
 
 	public StateFunc apply(Map<ObjectDefinition, StateFunc> parameterValues) {
-		// (1) mutate s(f) to s2(f) with param in ValueFunc transformed.
+		// (1) mutate s(f) to s2(f) with param value paramI.ValueFunc.
 		// (2) return combine ( s2(f) s(param1) s(param2) s param(3) )
+		if (parameterValues.isEmpty()) {
+			return this;
+		}
 		StateFunc m1 = new StateFunc();
 		m1.value = applyValue(this.value, parameterValues);
 		m1.branchCond = applyValue(this.branchCond, parameterValues);
@@ -242,6 +251,15 @@ public class StateFunc {
 		StateFunc m2 = combine(f);
 		m2.value = m1.value;
 		return m2;
+	}
+
+	public StateFunc addWhereClause(StateFunc clause) {
+		StateFunc m1 = new StateFunc();
+		m1.value = this.value;
+		m1.assigns = combineAssigns(ImmutableList.of(this.assigns, clause.assigns));
+		m1.updates = combineAssigns(ImmutableList.of(this.updates, clause.updates));
+		m1.branchCond = combineValue(ImmutableList.of(m1.branchCond, clause.value, clause.branchCond));
+		return m1;
 	}
 
 	@Override

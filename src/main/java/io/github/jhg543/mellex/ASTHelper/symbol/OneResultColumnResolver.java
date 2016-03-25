@@ -15,25 +15,33 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
 
 public class OneResultColumnResolver {
 
+	
 	private Map<String, ObjectDefinition> aliases;
 	private Set<String> currentColumnDependencies;
 	private String currentalias;
 
+	public void collectAlias(List<String> aliasList)
+	{
+		aliasList.forEach(s->
+		{
+			ObjectDefinition def = new ObjectDefinition();
+			def.setName(this.toString()+"_"+s);
+			aliases.put(s ,def);
+		});
+	}
 	/**
 	 * @param alias
 	 *            pass null if no alias
 	 */
 	public void newResultColumn(String alias) {
 		if (alias != null) {
-			ObjectDefinition d = new ObjectDefinition();
-			d.setName(alias);
-			aliases.put(alias, d);
 			currentalias = alias;
 		}
 		currentColumnDependencies = new HashSet<>();
@@ -53,7 +61,7 @@ public class OneResultColumnResolver {
 	}
 
 	private StateFunc searchNameAfterRewrite(String name) {
-		return result.getColumn(name);
+		return result.getColumnExprFunc(name);
 	}
 
 	public Tuple2<ObjectDefinition, StateFunc> searchByName(String name) {
@@ -68,23 +76,17 @@ public class OneResultColumnResolver {
 	private SelectStmtData result;
 
 	public SelectStmtData rewriteStateFunc(SelectStmtData tempResult) {
-		Map<String, Integer> colNameToNumber = new HashMap<>();
-		List<String> colNameList = tempResult.getColumnOrder();
-		IntStream.range(0, colNameList.size()).forEach(i -> colNameToNumber.put(colNameList.get(i), i));
 
+		List<ResultColumn> columns = tempResult.getColumns();
 		List<Set<Integer>> outEdgeNumber = outedges.stream()
-				.map(s -> s.stream().map(x -> colNameToNumber.get(x)).collect(Collectors.toSet())).collect(Collectors.toList());
-		List<StateFunc> newres = new ArrayList<>();
-		IntStream.range(0, colNameList.size()).forEach(i -> newres.add(tempResult.getColumn(i)));
-
-		Solver solver = new Solver(outEdgeNumber, newres, i -> aliases.get(colNameList.get(i)));
+				.map(s -> s.stream().map(tempResult.getNameIndexMap()::get).collect(Collectors.toSet())).collect(Collectors.toList());
+		List<StateFunc> newres = columns.stream().map(rc->rc.getExpr()).collect(Collectors.toList());
+		Solver solver = new Solver(outEdgeNumber, newres, i -> aliases.get(columns.get(i).getName()));
 		solver.solve();
 
-		ImmutableMap.Builder<String, StateFunc> b = ImmutableMap.builder();
-		IntStream.range(0, colNameList.size()).forEach(i -> b.put(colNameList.get(i), newres.get(i)));
-
-		result = new SelectStmtData(b.build(), ImmutableList.copyOf(colNameList));
-		return result;
+		List<ResultColumn> newrc = new ArrayList<>();
+		IntStream.range(0, columns.size()).forEach(i -> newrc.add(new ResultColumn(columns.get(i).getName(),columns.get(i).getPosition(),newres.get(i))));
+		return new SelectStmtData(newrc);
 	}
 
 	/**
@@ -124,6 +126,7 @@ public class OneResultColumnResolver {
 				solve(c);
 			}
 
+			
 			StateFunc s = result.get(i);
 			Map<ObjectDefinition, StateFunc> applyParam = new HashMap<>();
 			out.get(i).forEach(n -> applyParam.put(t.apply(n), result.get(n)));

@@ -36,7 +36,7 @@ public class StateTransformTest {
 		IntStream.range(0, m).forEach(i -> {
 			v[i] = new VariableDefinition();
 			v[i].setName("v" + i);
-			r[i] = new ObjectReference();
+			r[i] = new ObjectReference(null,null,0,0);
 			c[i] = new ColumnDefinition();
 			c[i].setName("c" + i);
 			r[i].setObjectDefinition(c[i]);

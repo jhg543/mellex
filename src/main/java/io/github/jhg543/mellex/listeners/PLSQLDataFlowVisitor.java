@@ -2,8 +2,11 @@ package io.github.jhg543.mellex.listeners;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.TokenStream;
@@ -15,7 +18,6 @@ import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
 import io.github.jhg543.mellex.ASTHelper.Influences;
 import io.github.jhg543.mellex.ASTHelper.InsertStmt;
 import io.github.jhg543.mellex.ASTHelper.ObjectName;
-import io.github.jhg543.mellex.ASTHelper.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.SubQuery;
 import io.github.jhg543.mellex.ASTHelper.UpdateStmt;
 import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
@@ -24,6 +26,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.ExprAnalyzeResult;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
+import io.github.jhg543.mellex.ASTHelper.plsql.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
@@ -114,6 +117,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	private String getText(RuleContext ctx) {
 		return stream.getText(ctx.getSourceInterval());
+	}
+
+	private static StateFunc funcOfExpr(Object expr) {
+		return ((ExprAnalyzeResult) expr).getTransformation();
 	}
 
 	@Override
@@ -326,79 +333,79 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	private void exitCreate_table_stmt(Create_table_stmtContext ctx) {
-		CreateTableStmt stmt = new CreateTableStmt();
-		ctx.stmt = stmt;
-		ObjectName name = ctx.obj.objname;
-		stmt.dbobj = name;
-		if (ctx.st != null) {
-			// has source table
-			SubQuery sourceTable = ctx.st.q;
-			if (ctx.def != null) {
-				for (String colname : ctx.def.colnames) {
-					ObjectName cn = new ObjectName();
-					cn.ns.addAll(name.ns);
-					cn.ns.add(colname);
-					ResultColumn c = new ResultColumn();
-					c.name = colname;
-					c.inf.addInResultExpression(cn);
-					stmt.columns.add(c);
-				}
-
-			} else {
-				for (ResultColumn oc : sourceTable.columns) {
-					String colname = oc.name;
-					ObjectName cn = new ObjectName();
-					cn.ns.addAll(name.ns);
-					cn.ns.add(colname);
-					ResultColumn c = new ResultColumn();
-					c.name = colname;
-					c.inf.addInResultExpression(cn);
-					stmt.columns.add(c);
-				}
-			}
-
-			if (!(ctx.st.nodata)) {
-				// will copy source table data
-				InsertStmt ins = new InsertStmt();
-				ins.copyResultColumnNames(stmt);
-				for (int i = 0; i < ins.columns.size(); ++i) {
-					ResultColumn c = ins.columns.get(i);
-
-					if (sourceTable.columns == null) {
-						ObjectName n = new ObjectName();
-						n.ns.addAll(sourceTable.dbobj.ns);
-						n.ns.add(c.name);
-						c.inf.addInResultExpression(n);
-					} else {
-						// ResultColumn tc = q.searchcol(c.name); WTF TD 532
-						ResultColumn tc = sourceTable.columns.get(i);
-						if (tc == null) {
-							throw new RuntimeException("col not found " + c.name);
-						}
-						c.inf.addAll(tc.inf);
-					}
-				}
-				ins.dbobj = stmt.dbobj;
-				ctx.insert = ins;
-			}
-		} else {
-			// col def only
-			for (String colname : ctx.def.colnames) {
-				ObjectName cn = new ObjectName();
-				cn.ns.addAll(name.ns);
-				cn.ns.add(colname);
-				ResultColumn c = new ResultColumn();
-				c.name = colname;
-				c.inf.addInResultExpression(cn);
-				stmt.columns.add(c);
-			}
-		}
-		if (Misc.isvolatile(stmt.dbobj)) {
-			ctx.isvolatile = true;
-		}
-		stmt.setVolatile(ctx.isvolatile);
-
-		provider.putTable(stmt, ctx.isvolatile);
+		// CreateTableStmt stmt = new CreateTableStmt();
+		// ctx.stmt = stmt;
+		// ObjectName name = ctx.obj.objname;
+		// stmt.dbobj = name;
+		// if (ctx.st != null) {
+		// // has source table
+		// SubQuery sourceTable = ctx.st.q;
+		// if (ctx.def != null) {
+		// for (String colname : ctx.def.colnames) {
+		// ObjectName cn = new ObjectName();
+		// cn.ns.addAll(name.ns);
+		// cn.ns.add(colname);
+		// ResultColumn c = new ResultColumn();
+		// c.name = colname;
+		// c.inf.addInResultExpression(cn);
+		// stmt.columns.add(c);
+		// }
+		//
+		// } else {
+		// for (ResultColumn oc : sourceTable.columns) {
+		// String colname = oc.name;
+		// ObjectName cn = new ObjectName();
+		// cn.ns.addAll(name.ns);
+		// cn.ns.add(colname);
+		// ResultColumn c = new ResultColumn();
+		// c.name = colname;
+		// c.inf.addInResultExpression(cn);
+		// stmt.columns.add(c);
+		// }
+		// }
+		//
+		// if (!(ctx.st.nodata)) {
+		// // will copy source table data
+		// InsertStmt ins = new InsertStmt();
+		// ins.copyResultColumnNames(stmt);
+		// for (int i = 0; i < ins.columns.size(); ++i) {
+		// ResultColumn c = ins.columns.get(i);
+		//
+		// if (sourceTable.columns == null) {
+		// ObjectName n = new ObjectName();
+		// n.ns.addAll(sourceTable.dbobj.ns);
+		// n.ns.add(c.name);
+		// c.inf.addInResultExpression(n);
+		// } else {
+		// // ResultColumn tc = q.searchcol(c.name); WTF TD 532
+		// ResultColumn tc = sourceTable.columns.get(i);
+		// if (tc == null) {
+		// throw new RuntimeException("col not found " + c.name);
+		// }
+		// c.inf.addAll(tc.inf);
+		// }
+		// }
+		// ins.dbobj = stmt.dbobj;
+		// ctx.insert = ins;
+		// }
+		// } else {
+		// // col def only
+		// for (String colname : ctx.def.colnames) {
+		// ObjectName cn = new ObjectName();
+		// cn.ns.addAll(name.ns);
+		// cn.ns.add(colname);
+		// ResultColumn c = new ResultColumn();
+		// c.name = colname;
+		// c.inf.addInResultExpression(cn);
+		// stmt.columns.add(c);
+		// }
+		// }
+		// if (Misc.isvolatile(stmt.dbobj)) {
+		// ctx.isvolatile = true;
+		// }
+		// stmt.setVolatile(ctx.isvolatile);
+		//
+		// provider.putTable(stmt, ctx.isvolatile);
 
 	}
 
@@ -455,47 +462,48 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	private void exitCreate_view_stmt(Create_view_stmtContext ctx) {
-		CreateTableStmt stmt = new CreateTableStmt();
-		ctx.stmt = stmt;
-
-		stmt.dbobj = ctx.obj.objname;
-
-		SubQuery q = ctx.ss.q;
-
-		if (q.columns.size() != ctx.cn.size() && ctx.cn.size() > 0) {
-			throw new RuntimeException("column size mismatch " + ctx.obj.objname);
-		}
-
-		// write column names
-		for (int i = 0; i < q.columns.size(); ++i) {
-			String colname;
-			if (ctx.cn.size() > 0) {
-				colname = ctx.cn.get(i).getText();
-			} else {
-				colname = q.columns.get(i).name;
-			}
-			ObjectName coln = new ObjectName();
-			coln.ns.addAll(ctx.obj.objname.ns);
-			coln.ns.add(colname);
-			ResultColumn c = new ResultColumn();
-			c.name = colname;
-			c.inf.addInResultExpression(coln);
-			stmt.columns.add(c);
-		}
-
-		// mark data source
-		InsertStmt ins = new InsertStmt();
-		ins.copyResultColumnNames(stmt);
-		for (int i = 0; i < ins.columns.size(); ++i) {
-			ResultColumn c = ins.columns.get(i);
-			c.inf.addAll(q.columns.get(i).inf);
-
-		}
-		ctx.insert = ins;
-		ins.dbobj = stmt.dbobj;
-		stmt.setViewDef(ins);
-
-		provider.putTable(stmt, false);
+		// CreateTableStmt stmt = new CreateTableStmt();
+		// ctx.stmt = stmt;
+		//
+		// stmt.dbobj = ctx.obj.objname;
+		//
+		// SubQuery q = ctx.ss.q;
+		//
+		// if (q.columns.size() != ctx.cn.size() && ctx.cn.size() > 0) {
+		// throw new RuntimeException("column size mismatch " +
+		// ctx.obj.objname);
+		// }
+		//
+		// // write column names
+		// for (int i = 0; i < q.columns.size(); ++i) {
+		// String colname;
+		// if (ctx.cn.size() > 0) {
+		// colname = ctx.cn.get(i).getText();
+		// } else {
+		// colname = q.columns.get(i).name;
+		// }
+		// ObjectName coln = new ObjectName();
+		// coln.ns.addAll(ctx.obj.objname.ns);
+		// coln.ns.add(colname);
+		// ResultColumn c = new ResultColumn();
+		// c.name = colname;
+		// c.inf.addInResultExpression(coln);
+		// stmt.columns.add(c);
+		// }
+		//
+		// // mark data source
+		// InsertStmt ins = new InsertStmt();
+		// ins.copyResultColumnNames(stmt);
+		// for (int i = 0; i < ins.columns.size(); ++i) {
+		// ResultColumn c = ins.columns.get(i);
+		// c.inf.addAll(q.columns.get(i).inf);
+		//
+		// }
+		// ctx.insert = ins;
+		// ins.dbobj = stmt.dbobj;
+		// stmt.setViewDef(ins);
+		//
+		// provider.putTable(stmt, false);
 
 	}
 
@@ -608,14 +616,14 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	private void exitUpdate_stmt_set(Update_stmt_setContext ctx) {
-		List<ResultColumn> columns = new ArrayList<>();
-		ctx.columns = columns;
-		for (int i = 0; i < ctx.cn.size(); ++i) {
-			ResultColumn c = new ResultColumn();
-			c.name = ctx.cn.get(i).getText();
-			c.inf.addAll(ctx.ex.get(i).inf);
-			columns.add(c);
-		}
+		// List<ResultColumn> columns = new ArrayList<>();
+		// ctx.columns = columns;
+		// for (int i = 0; i < ctx.cn.size(); ++i) {
+		// ResultColumn c = new ResultColumn();
+		// c.name = ctx.cn.get(i).getText();
+		// c.inf.addAll(ctx.ex.get(i).inf);
+		// columns.add(c);
+		// }
 	}
 
 	private void exitObject_name(Object_nameContext ctx) {
@@ -643,36 +651,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		}
 		Sql_stmtContext stmt = getInvokingRule(ctx, Sql_stmtContext.class);
 		stmt.cte_stack.push(ctx.q);
-	}
-
-	private void exitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
-		ResultColumn rc = new ResultColumn();
-		rc.name = "*";
-		ctx.rc = rc;
-	}
-
-	private void exitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
-		ResultColumn rc = new ResultColumn();
-		rc.name = ctx.tn.getText() + ".*";
-		rc.setObjectName(true);
-		ctx.rc = rc;
-	}
-
-	private void exitResult_columnExpr(Result_columnExprContext ctx) {
-		ResultColumn rc = new ResultColumn();
-		rc.inf.addAll(ctx.ex.inf);
-		if (ctx.ex.objname != null) {
-			rc.setObjectName(true);
-		}
-		if (ctx.ca != null) {
-			rc.name = ctx.ca.getText();
-			rc.hasAlias = true;
-		} else {
-
-			rc.name = ctx.ex.getText();
-
-		}
-		ctx.rc = rc;
 	}
 
 	private void exitTable_or_subqueryTable(Table_or_subqueryTableContext ctx) {
@@ -936,13 +914,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
 		String name = ctx.getText();
-		Object def = scopeStack.searchByName(name);
+		Object def = nameResolver.searchByName(name);
 
 		if (def instanceof ColumnDefinition) {
-			ObjectReference r = new ObjectReference();
-			r.setLineNumber(ctx.getStart().getLine());
-			r.setCharPosition(ctx.getStart().getLine());
-			r.setFileName(fileID);
+			ObjectReference r = new ObjectReference((ColumnDefinition) def, fileID, ctx.getStart().getLine(),
+					ctx.getStart().getCharPositionInLine());
 			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
 		} else if (def instanceof VariableDefinition) {
 			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)), name);
@@ -1047,8 +1023,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public StateFunc visitOrdering_term_window(Ordering_term_windowContext ctx) {
-		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		return e.getTransformation();
+		return funcOfExpr(ctx.operand1.accept(this));
 	}
 
 	@Override
@@ -1059,29 +1034,32 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public List<Tuple2<String,StateFunc>> visitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
-		visitChildren(ctx);
-		exitResult_columnAsterisk(ctx);
-		return null;
+	public List<Tuple2<String, StateFunc>> visitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
+		List<Tuple2<String, StateFunc>> result = nameResolver.searchWildcardAll(fileID, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+		result.forEach(x->nameResolver.enterResultColumn(null));
+		return result;
 	}
 
 	@Override
-	public List<Tuple2<String,StateFunc>> visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
+	public List<Tuple2<String, StateFunc>> visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
 		String tableName = ctx.tn.getText();
-		
-		visitChildren(ctx);
-		exitResult_columnTableAsterisk(ctx);
-		return null;
+		List<Tuple2<String, StateFunc>> result = nameResolver.searchWildcardOneTable(tableName, fileID, ctx.getStart().getLine(),
+				ctx.getStart().getCharPositionInLine());
+		result.forEach(x->nameResolver.enterResultColumn(null));
+		return result;
 	}
 
 	@Override
-	public List<Tuple2<String,StateFunc>> visitResult_columnExpr(Result_columnExprContext ctx) {
-		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.ex.accept(this);
+	public List<Tuple2<String, StateFunc>> visitResult_columnExpr(Result_columnExprContext ctx) {
+
 		String alias = null;
-		if (ctx.ca!=null)
-		{
+		if (ctx.ca != null) {
 			alias = ctx.ca.getText();
+		} else {
+			alias = null;
 		}
+		nameResolver.enterResultColumn(alias);
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.ex.accept(this);
 		return Collections.singletonList(Tuple2.of(alias, e.getTransformation()));
 	}
 
@@ -1123,59 +1101,123 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		if (ctx.jc != null) {
 			// visit all Table or subquery to construct name resolver
-			for (Table_or_subqueryContext sub:ctx.jc.ts)
-			{
+			for (Table_or_subqueryContext sub : ctx.jc.ts) {
 				sub.accept(this);
 			}
 		}
 
+		List<ResultColumn> columns = new ArrayList<>();
+
+		List<String> aliasList = new ArrayList<>();
+
+		for (Result_columnContext rcctx : ctx.r) {
+			if (rcctx instanceof Result_columnExprContext) {
+				Result_columnExprContext rcexpr = (Result_columnExprContext) rcctx;
+				if (rcexpr.ca != null) {
+					aliasList.add(rcexpr.ca.getText());
+				}
+			}
+		}
+
+		nameResolver.collectResultColumnAlias(aliasList);
 		
-		
+		for (Result_columnContext rcctx : ctx.r) {
+			List<Tuple2<String, StateFunc>> rc = (List<Tuple2<String, StateFunc>>) rcctx.accept(this);
+			for (Tuple2<String, StateFunc> tuple : rc) {
+				columns.add(new ResultColumn(tuple.getField0(), columns.size(), tuple.getField1()));
+			}
+		}
+
+		SelectStmtData ss = nameResolver.rewriteAfterResultColumns(new SelectStmtData(columns));
+
+		List<StateFunc> clauses = new ArrayList<>();
+
+		// join clause
+		if (ctx.jc != null) {
+			// visit all Table or subquery to construct name resolver
+			for (ExprContext sub : ctx.jc.ex) {
+				clauses.add(funcOfExpr(sub.accept(this)));
+			}
+		}
+
+		// where
+		if (ctx.w1 != null) {
+			clauses.add((StateFunc) ctx.w1.accept(this));
+		}
+
+		// having
+		if (ctx.h1 != null) {
+			clauses.add((StateFunc) ctx.h1.accept(this));
+		}
+
+		// qualify
+		if (ctx.q1 != null) {
+			clauses.add((StateFunc) ctx.q1.accept(this));
+		}
+
+		// group by
+		if (ctx.g1 != null) {
+			Tuple2<List<StateFunc>, List<Integer>> r = (Tuple2<List<StateFunc>, List<Integer>>) ctx.g1.accept(this);
+			clauses.addAll(r.getField0());
+			r.getField1().stream().map(i -> ss.getColumnExprFunc(i)).forEach(clauses::add);
+		}
+
+		if (ctx.g2 != null) {
+			Tuple2<List<StateFunc>, List<Integer>> r = (Tuple2<List<StateFunc>, List<Integer>>) ctx.g2.accept(this);
+			clauses.addAll(r.getField0());
+			r.getField1().stream().map(i -> ss.getColumnExprFunc(i)).forEach(clauses::add);
+		}
+
+		// order by
+		if (ctx.o1 != null) {
+			Tuple2<List<StateFunc>, List<Integer>> r = (Tuple2<List<StateFunc>, List<Integer>>) ctx.o1.accept(this);
+			clauses.addAll(r.getField0());
+			r.getField1().stream().map(i -> ss.getColumnExprFunc(i)).forEach(clauses::add);
+		}
+
+		StateFunc combinedClause = StateFunc.combine(clauses);
+
 		nameResolver.exitSelectStmt(ctx);
 		return null;
 	}
 
 	@Override
-	public Object visitOrder_by_clause(Order_by_clauseContext ctx) {
-		visitChildren(ctx);
-		exitOrder_by_clause(ctx);
-		return null;
+	public Tuple2<List<StateFunc>, List<Integer>> visitOrder_by_clause(Order_by_clauseContext ctx) {
+		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
+		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
+		return Tuple2.of(exprs, indexes);
 	}
 
 	@Override
-	public Object visitWhere_clause(Where_clauseContext ctx) {
-		visitChildren(ctx);
-		exitWhere_clause(ctx);
-		return null;
+	public StateFunc visitWhere_clause(Where_clauseContext ctx) {
+		return funcOfExpr(ctx.ex.accept(this));
+
 	}
 
 	@Override
-	public Object visitGrouping_by_clause(Grouping_by_clauseContext ctx) {
-		visitChildren(ctx);
-		exitGrouping_by_clause(ctx);
-		return null;
+	public Tuple2<List<StateFunc>, List<Integer>> visitGrouping_by_clause(Grouping_by_clauseContext ctx) {
+		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
+		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
+		return Tuple2.of(exprs, indexes);
 	}
 
 	@Override
-	public Object visitHaving_clause(Having_clauseContext ctx) {
-		visitChildren(ctx);
-		exitHaving_clause(ctx);
-		return null;
+	public StateFunc visitHaving_clause(Having_clauseContext ctx) {
+		return funcOfExpr(ctx.ex.accept(this));
+
 	}
 
 	@Override
-	public Object visitQualify_clause(Qualify_clauseContext ctx) {
-		visitChildren(ctx);
-		exitQualify_clause(ctx);
-		return null;
+	public StateFunc visitQualify_clause(Qualify_clauseContext ctx) {
+		return funcOfExpr(ctx.ex.accept(this));
+
 	}
 
 	@Override
 	public StateFunc visitWindow(WindowContext ctx) {
 		List<StateFunc> s = new ArrayList<>();
 		for (ExprContext p : ctx.ex) {
-			ExprAnalyzeResult e = (ExprAnalyzeResult) p.accept(this);
-			s.add(e.getTransformation());
+			s.add(funcOfExpr(p.accept(this)));
 		}
 		for (Ordering_term_windowContext p : ctx.ox) {
 			s.add((StateFunc) p.accept(this));
