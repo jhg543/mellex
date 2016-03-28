@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.google.common.base.Preconditions;
 
+import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
@@ -36,42 +37,42 @@ public class NameResolver {
 
 	}
 
-	public Object searchByName(String name) {
+	public Tuple2<ObjectDefinition,StateFunc> searchByName(String name) {
 		Object result;
 
 		result = pse.searchByName(name);
 		if (result != null) {
-			return result;
+			return Tuple2.of(null, null);
 		}
 
 		result = alias.searchByName(name);
 		if (result != null) {
-			return result;
+			return (Tuple2<ObjectDefinition, StateFunc>) result;
 		}
 
 		result = local.searchByName(name);
 		if (result != null) {
-			return result;
+			return Tuple2.of((ObjectDefinition)result, null);
 		}
 
 		result = global.searchByName(name);
 		if (result != null) {
-			return result;
+			return Tuple2.of((ObjectDefinition)result, null);
 		}
 
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			result = ors.searchByName(name);
 			if (result != null) {
-				return result;
+				return (Tuple2<ObjectDefinition, StateFunc>) result;
 			}
 		}
 
 		result = alias.guessColumn(name);
 		if (result != null) {
-			return result;
+			return Tuple2.of((ObjectDefinition)result, null);
 		}
 
-		return null;
+		throw new RuntimeException("Can't resolve name " + name);
 	}
 
 	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {
@@ -108,6 +109,7 @@ public class NameResolver {
 	}
 
 	public void enterSelectStmt(Object scopeId) {
+		alias.pushScope(scopeId);
 		local.pushScope(scopeId,true);
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.enterSelectStmt();
@@ -116,6 +118,7 @@ public class NameResolver {
 
 	public void exitSelectStmt(Object scopeId) {
 		local.popScope(scopeId);
+		alias.popScope(scopeId);
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.exitSelectStmt();
 		}

@@ -23,9 +23,12 @@ import io.github.jhg543.mellex.util.tuple.Tuple2;
 public class OneResultColumnResolver {
 
 	
-	private Map<String, ObjectDefinition> aliases;
+	private Map<String, ObjectDefinition> aliases = new HashMap<>();
 	private Set<String> currentColumnDependencies;
 	private String currentalias;
+
+	private List<Set<String>> outedges = new ArrayList<>();
+	private SelectStmtData result;	
 
 	public void collectAlias(List<String> aliasList)
 	{
@@ -72,8 +75,6 @@ public class OneResultColumnResolver {
 		}
 	}
 
-	private List<Set<String>> outedges;
-	private SelectStmtData result;
 
 	public SelectStmtData rewriteStateFunc(SelectStmtData tempResult) {
 

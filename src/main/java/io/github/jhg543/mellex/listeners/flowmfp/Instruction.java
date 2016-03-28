@@ -29,6 +29,10 @@ public class  Instruction<S> {
 	public void setDebugInfo(Object debugInfo) {
 		this.debugInfo = debugInfo;
 	}
+	public Instruction(Object debugInfo) {
+		super();
+		this.debugInfo = debugInfo;
+	}
 	
 	
 	

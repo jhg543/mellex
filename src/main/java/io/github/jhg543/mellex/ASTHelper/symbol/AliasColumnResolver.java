@@ -73,6 +73,7 @@ public class AliasColumnResolver {
 	public void addFromTable(String tableName, String alias) {
 		// with ctetable1 as ... select * from ctetable1;
 		if (cte.containsKey(tableName)) {
+			scopes.peek().getSubqueries().put(tableName, cte.get(tableName));
 			return;
 		}
 		scopes.peek().getLiveTables().put(alias == null ? tableName : alias, tableResolver.apply(tableName));
@@ -86,21 +87,12 @@ public class AliasColumnResolver {
 
 	public List<Tuple2<String, StateFunc>> wildCardAll(String fileName, int lineNumber, int charPosition) {
 		Scope s = scopes.peek();
-		Stream<Tuple2<String, StateFunc>> a = s.subqueries.entrySet().stream().flatMap(
-				es->
-				es.getValue().getColumns().stream()
-				.map(
-						rc -> Tuple2.of(rc.getName(), rc.getExpr())
-						)
-				);
-		
-		Stream<Tuple2<String, StateFunc>> b =  s.getLiveTables().entrySet().stream().flatMap(
-				es->
-				es.getValue().getColumns().entrySet().stream()
-				.map(e -> Tuple2.of(e.getKey(),
-						StateFunc.ofValue(
-								ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
-				);
+		Stream<Tuple2<String, StateFunc>> a = s.subqueries.entrySet().stream()
+				.flatMap(es -> es.getValue().getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr())));
+
+		Stream<Tuple2<String, StateFunc>> b = s.getLiveTables().entrySet().stream()
+				.flatMap(es -> es.getValue().getColumns().entrySet().stream().map(e -> Tuple2.of(e.getKey(), StateFunc
+						.ofValue(ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition))))));
 		return Stream.concat(a, b).collect(Collectors.toList());
 	}
 
@@ -110,8 +102,7 @@ public class AliasColumnResolver {
 		SelectStmtData ss = s.subqueries.get(tableName);
 		if (ss != null) {
 			// TODO does order important in "*"?
-			return ss.getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr()))
-					.collect(Collectors.toList());
+			return ss.getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr())).collect(Collectors.toList());
 		}
 
 		TableDefinition td = s.liveTables.get(tableName);
@@ -199,6 +190,9 @@ public class AliasColumnResolver {
 
 		} else if (namedotsplit.size() == 1) {
 			Tuple3<String, ColumnDefinition, StateFunc> t = searchColumn(name);
+			if (t == null) {
+				return null;
+			}
 			return Tuple2.of(t.getField1(), t.getField2());
 		} else {
 			// d.size>2

@@ -394,7 +394,7 @@ locals [ Stack<SubQuery> cte_stack = new Stack<>() ]
                                       | rollback_stmt
                                       | savepoint_stmt
 /*                                      | simple_select_stmt*/
-                                      | select_stmt
+                                      | non_subquery_select_stmt
                                       | update_stmt
 /*                                      | update_stmt_limited*/
                                       | vacuum_stmt
@@ -407,6 +407,10 @@ locals [ Stack<SubQuery> cte_stack = new Stack<>() ]
                                       | truncate_table_stmt
                                       )
  ;
+
+non_subquery_select_stmt :
+    select_stmt
+;
 
 call_stmt:
  K_CALL expr

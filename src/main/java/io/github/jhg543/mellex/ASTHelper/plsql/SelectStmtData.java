@@ -53,4 +53,18 @@ public class SelectStmtData {
 
 	}
 
+	@Override
+	public String toString() {
+		String s = "SelectStmt [";
+		for (ResultColumn rc:columns)
+		{
+			s+="\t";
+			s+=rc.getName();
+			s+=" = ";
+			s+=rc.getExpr();
+		}
+		s+="]";		
+		return s;
+	}
+
 }

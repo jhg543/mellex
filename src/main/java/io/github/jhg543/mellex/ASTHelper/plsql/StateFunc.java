@@ -57,7 +57,7 @@ public class StateFunc {
 	 * @return combined sets (immutable)
 	 */
 	private static ValueFunc combineValue(List<ValueFunc> subs) {
-
+		subs = new ArrayList<>(subs);
 		subs.removeIf(v -> v.equals(ValueFunc.of()));
 
 		if (subs.size() == 0) {
@@ -91,7 +91,7 @@ public class StateFunc {
 	 * @return
 	 */
 	private static Map<ObjectDefinition, ValueFunc> combineAssigns(List<Map<ObjectDefinition, ValueFunc>> subs) {
-
+		subs = new ArrayList<>(subs);
 		subs.removeIf(Map::isEmpty);
 
 		if (subs.size() == 0) {
@@ -113,7 +113,7 @@ public class StateFunc {
 	}
 
 	public static StateFunc combine(List<StateFunc> subs) {
-
+		subs = new ArrayList<>(subs);
 		subs.removeIf(s -> s.equals(StateFunc.of()));
 
 		if (subs.size() == 1) {
@@ -258,14 +258,38 @@ public class StateFunc {
 		m1.value = this.value;
 		m1.assigns = combineAssigns(ImmutableList.of(this.assigns, clause.assigns));
 		m1.updates = combineAssigns(ImmutableList.of(this.updates, clause.updates));
-		m1.branchCond = combineValue(ImmutableList.of(m1.branchCond, clause.value, clause.branchCond));
+		m1.branchCond = combineValue(ImmutableList.of(this.branchCond, clause.value, clause.branchCond));
 		return m1;
 	}
 
 	@Override
 	public String toString() {
-		return "StateFunc [value=" + value + ", updates=" + updates + ", assigns=" + assigns + ", branchCond=" + branchCond
-				+ "]";
+		String sb = "StateFunc [";
+		if (!value.isEmpty())
+		{
+			sb+=" value=";
+			sb+=value;
+		}
+		
+		if (!branchCond.isEmpty())
+		{
+			sb+=" branchCond=";
+			sb+=branchCond;
+		}
+		if (!updates.isEmpty())
+		{
+			sb+=" updates=";
+			sb+=updates;
+		}
+		
+		if (!assigns.isEmpty())
+		{
+			sb+=" assigns=";
+			sb+=assigns;
+		}
+		
+		sb+="]";
+		return sb;
 	}
 
 }

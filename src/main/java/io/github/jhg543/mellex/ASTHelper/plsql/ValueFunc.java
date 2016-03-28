@@ -26,39 +26,39 @@ public class ValueFunc {
 		this.parameters = parameters;
 	}
 
-	private static ValueFunc createEmpty()
-	{
+	private static ValueFunc createEmpty() {
 		ValueFunc v = new ValueFunc();
 		v.objects = Collections.emptySet();
 		v.parameters = Collections.emptySet();
 		return v;
 	}
-	
+
 	private static ValueFunc EMPTY = createEmpty();
-	
-	public static ValueFunc of()
-	{
+
+	public static ValueFunc of() {
 		return EMPTY;
 	}
-	
-	public static ValueFunc of(ObjectReference... columnReference)
-	{
+
+	public boolean isEmpty() {
+		return objects.isEmpty() && parameters.isEmpty();
+	}
+
+	public static ValueFunc of(ObjectReference... columnReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = ImmutableSet.copyOf(columnReference);
 		v.parameters = Collections.emptySet();
 		return v;
 	}
-	
-	public static ValueFunc of(ObjectDefinition... variableReference)
-	{
+
+	public static ValueFunc of(ObjectDefinition... variableReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = Collections.emptySet();
 		v.parameters = ImmutableSet.copyOf(variableReference);
 		return v;
 	}
-	
-	public static ValueFunc of(Collection<? extends ObjectDefinition> variableReference,Collection<? extends ObjectReference> columnReference)
-	{
+
+	public static ValueFunc of(Collection<? extends ObjectDefinition> variableReference,
+			Collection<? extends ObjectReference> columnReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = ImmutableSet.copyOf(columnReference);
 		v.parameters = ImmutableSet.copyOf(variableReference);
@@ -67,7 +67,8 @@ public class ValueFunc {
 
 	@Override
 	public String toString() {
-		return "ValueFunc [objects=" + objects + ", parameters=" + parameters + "]";
+		return "VF [" + (objects.isEmpty() ? "" : ("obj=" + objects))
+				+ (parameters.isEmpty() ? "" : (" param=" + parameters)) + "]";
 	}
-	
+
 }

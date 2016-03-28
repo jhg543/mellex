@@ -1,5 +1,6 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -14,7 +15,7 @@ import io.github.jhg543.mellex.util.tuple.Tuple2;
 public class GlobalObjectResolver {
 
 	private boolean guessEnabled;
-	private Map<String, FunctionDefinition> functions;
+	private Map<String, FunctionDefinition> functions = new HashMap<>();
 	private Function<String, TableDefinition> tableResolver;
 
 	public GlobalObjectResolver(boolean guessEnabled, Function<String, TableDefinition> tableResolver) {
@@ -25,6 +26,9 @@ public class GlobalObjectResolver {
 
 	private static Tuple2<String, String> splitLastDot(String name) {
 		int pos = name.lastIndexOf('.');
+		if (pos == -1) {
+			return null;
+		}
 		return Tuple2.of(name.substring(0, pos), name.substring(pos + 1, name.length()));
 	}
 
@@ -37,6 +41,9 @@ public class GlobalObjectResolver {
 		// TODO what if no dot in name?
 		Tuple2<String, String> namesplit = splitLastDot(name);
 
+		if (namesplit == null) {
+			return null;
+		}
 		TableDefinition td = searchTable(namesplit.getField0());
 		if (td == null) {
 			return null;
