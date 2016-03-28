@@ -13,5 +13,10 @@ public class ColumnDefinition extends ObjectDefinition {
 	public void setInfered(boolean infered) {
 		this.infered = infered;
 	}
+
+	public ColumnDefinition(String name) {
+		super();
+		this.setName(name);
+	}
 	
 }

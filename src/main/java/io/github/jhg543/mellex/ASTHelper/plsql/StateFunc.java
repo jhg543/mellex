@@ -30,7 +30,7 @@ public class StateFunc {
 														// since used in result
 														// column
 	/**
-	 * For Select it's where having order.... clause For expr it's only come
+	 * For Select it's "where ... having... order...." clause, For expr it's only come
 	 * from inline select stmt For Function def it's
 	 * 
 	 */

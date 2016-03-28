@@ -215,9 +215,8 @@ public class AliasColumnResolver {
 		Scope s = scopes.peek();
 		if (s.getSubqueries().size() == 0 && s.getLiveTables().size() == 1) {
 			Entry<String, TableDefinition> e = s.getLiveTables().entrySet().iterator().next();
-			ColumnDefinition cd = new ColumnDefinition();
+			ColumnDefinition cd = new ColumnDefinition(e.getKey());
 			cd.setInfered(true);
-			cd.setName(e.getKey());
 			e.getValue().getColumns().put(e.getKey(), cd);
 			return cd;
 		} else {

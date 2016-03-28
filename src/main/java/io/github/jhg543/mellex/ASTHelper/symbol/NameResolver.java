@@ -6,6 +6,7 @@ import com.google.common.base.Preconditions;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
+import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
 
@@ -16,6 +17,24 @@ public class NameResolver {
 	private OtherResultColumnResolver ors;
 	private PseudoColumnResolver pse;
 	private DatabaseVendor vendor;
+	private TableStorage tableStorage;
+
+	
+	
+	public NameResolver(DatabaseVendor vendor, TableStorage tableStorage) {
+		super();
+		this.vendor = vendor;
+		this.tableStorage = tableStorage;
+		this.alias = new AliasColumnResolver(vendor.equals(DatabaseVendor.ORACLE), tableStorage::getTable);
+		this.local = new LocalObjectResolver();
+		this.global = new GlobalObjectResolver(true,  tableStorage::getTable);
+		this.pse = new PseudoColumnResolver(vendor);
+		if (vendor.equals(DatabaseVendor.TERADATA))
+		{
+			this.ors = new OtherResultColumnResolver();
+		}
+
+	}
 
 	public Object searchByName(String name) {
 		Object result;
@@ -89,7 +108,7 @@ public class NameResolver {
 	}
 
 	public void enterSelectStmt(Object scopeId) {
-		local.pushScope(scopeId, vendor.equals(DatabaseVendor.ORACLE));
+		local.pushScope(scopeId,true);
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.enterSelectStmt();
 		}
@@ -120,6 +139,16 @@ public class NameResolver {
 		return tempResult;
 	}
 
+	public void defineTable(String name, TableDefinition def)
+	{
+		tableStorage.putTable(name, def);
+	}
+	
+	public TableDefinition searchTable(String name)
+	{
+		return tableStorage.getTable(name);
+	}
+	
 	public void addFromTable(String tableName, String alias) {
 		this.alias.addFromTable(tableName, alias);
 	}
