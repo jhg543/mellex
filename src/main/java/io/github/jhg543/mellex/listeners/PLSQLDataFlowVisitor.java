@@ -43,6 +43,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Any_nameContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Case_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_defContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_defsContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_nameContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Common_table_expressionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_procedureContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_source_tableContext;
@@ -347,21 +348,23 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		if (ctx.def != null) {
 			List<String> colnames = (List<String>) ctx.def.accept(this);
 			for (String colname : colnames) {
-				def.getColumns().put(colname, new ColumnDefinition(colname));
+				def.addColumn(colname);
+
 			}
 			nameResolver.defineTable(tableName, def);
 		} else {
 			Object ss = ctx.st.accept(this);
 			if (ss instanceof String) {
 				TableDefinition sourceTableDef = nameResolver.searchTable((String) ss);
-				for (String colname : sourceTableDef.getColumns().keySet()) {
-					def.getColumns().put(colname, new ColumnDefinition(colname));
+				for (ColumnDefinition srcColDef : sourceTableDef.getColumns()) {
+
+					def.addColumn(srcColDef.getName());
 				}
 				nameResolver.defineTable(tableName, def);
 			} else {
 				SelectStmtData selectStmt = (SelectStmtData) ss;
 				for (ResultColumn rc : selectStmt.getColumns()) {
-					def.getColumns().put(rc.getName(), new ColumnDefinition(rc.getName()));
+					def.addColumn(rc.getName());
 				}
 				nameResolver.defineTable(tableName, def);
 
@@ -397,55 +400,25 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitCreate_view_stmt(Create_view_stmtContext ctx) {
-		visitChildren(ctx);
-		exitCreate_view_stmt(ctx);
+		// TODO the source table data
+		String tableName = ctx.obj.getText();
+		TableDefinition def = new TableDefinition();
+		if (ctx.cn.size() > 0) {
+			List<String> colnames = new ArrayList<>();
+			for (Column_nameContext colctx : ctx.cn) {
+				colnames.add(colctx.getText());
+			}
+			nameResolver.defineTable(tableName, def);
+		} else {
+
+			SelectStmtData selectStmt = (SelectStmtData) ctx.ss.accept(this);
+			for (ResultColumn rc : selectStmt.getColumns()) {
+				def.addColumn(rc.getName());
+			}
+			nameResolver.defineTable(tableName, def);
+
+		}
 		return null;
-	}
-
-	private void exitCreate_view_stmt(Create_view_stmtContext ctx) {
-		// CreateTableStmt stmt = new CreateTableStmt();
-		// ctx.stmt = stmt;
-		//
-		// stmt.dbobj = ctx.obj.objname;
-		//
-		// SubQuery q = ctx.ss.q;
-		//
-		// if (q.columns.size() != ctx.cn.size() && ctx.cn.size() > 0) {
-		// throw new RuntimeException("column size mismatch " +
-		// ctx.obj.objname);
-		// }
-		//
-		// // write column names
-		// for (int i = 0; i < q.columns.size(); ++i) {
-		// String colname;
-		// if (ctx.cn.size() > 0) {
-		// colname = ctx.cn.get(i).getText();
-		// } else {
-		// colname = q.columns.get(i).name;
-		// }
-		// ObjectName coln = new ObjectName();
-		// coln.ns.addAll(ctx.obj.objname.ns);
-		// coln.ns.add(colname);
-		// ResultColumn c = new ResultColumn();
-		// c.name = colname;
-		// c.inf.addInResultExpression(coln);
-		// stmt.columns.add(c);
-		// }
-		//
-		// // mark data source
-		// InsertStmt ins = new InsertStmt();
-		// ins.copyResultColumnNames(stmt);
-		// for (int i = 0; i < ins.columns.size(); ++i) {
-		// ResultColumn c = ins.columns.get(i);
-		// c.inf.addAll(q.columns.get(i).inf);
-		//
-		// }
-		// ctx.insert = ins;
-		// ins.dbobj = stmt.dbobj;
-		// stmt.setViewDef(ins);
-		//
-		// provider.putTable(stmt, false);
-
 	}
 
 	private void exitInsert_stmt(Insert_stmtContext ctx) {
@@ -552,8 +525,58 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitInsert_stmt(Insert_stmtContext ctx) {
-		visitChildren(ctx);
-		exitInsert_stmt(ctx);
+		String tableName = ctx.obj.getText();
+		TableDefinition def = nameResolver.searchTable(tableName);
+		List<ColumnDefinition> cdefs = new ArrayList<>();
+		SelectStmtData ss = null;
+		if (ctx.ss!=null)
+		{
+			ss = (SelectStmtData) ctx.ss.accept(this);
+		}
+		if (ctx.cn.size()>0)
+		{
+			
+			
+			for (Column_nameContext colnamectx:ctx.cn)
+			{
+				String colname = colnamectx.getText();
+				ColumnDefinition cdef = def.getColumnByName(colname);
+				Preconditions.checkState(cdef!=null,"Column to insert %s.%s not found",tableName,colname);
+				cdefs.add(cdef);
+			}
+		}
+//		else if (ss!=null)
+//		{
+//			for (ResultColumn rc:ss.getColumns())
+//			{
+//				String colname = rc.getName();
+//				ColumnDefinition cdef = def.getColumnByName(colname);
+//				Preconditions.checkState(cdef!=null,"Column to insert %s.%s not found",tableName,colname);
+//				cdefs.add(cdef);
+//			}			
+//		}
+		else
+		{
+			cdefs = def.getColumns();
+		}
+		
+		List<StateFunc> exprs = new ArrayList<>();
+		if (ss!=null)
+		{
+			ss.getColumns().forEach(rc->exprs.add(rc.getExpr()));
+		}
+		else
+		{
+			for (ExprContext exprctx:ctx.ex)
+			{
+				exprs.add(funcOfExpr(exprctx.accept(this)));
+			}
+		}
+		
+		Preconditions.checkState(cdefs.size()==exprs.size(),"Column size %d != expr size %d",cdefs.size(),exprs.size());
+		//TODO REMOVE SELF ASSIGN FROM LIST
+		
+		instbuffer.add(new Instruction<>( StateFunc.combineInsertOrUpdate(cdefs, exprs)));
 		return null;
 	}
 
@@ -654,7 +677,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		if (ctx.function_name() != null) {
 			String fn = ctx.function_name().getText();
-			fndef = scopeStack.searchByName(fn, FunctionDefinition.class);
+			// TODO can return type cast to fndef?
+			fndef = nameResolver.searchFunction(fn);
 		}
 
 		if (fndef == null) {
@@ -680,8 +704,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public ExprAnalyzeResult visitExprExists(ExprExistsContext ctx) {
-		StateFunc ss = (StateFunc) ctx.ss.accept(this);
-		return new ExprAnalyzeResult(ss);
+		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
+		StateFunc fn = StateFunc.combineNoValue(ss.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()));
+		return new ExprAnalyzeResult(fn);
 	}
 
 	@Override
@@ -692,6 +717,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
 		String name = ctx.getText();
+		// TODO count(*)?
+		if ("*".equals(name)) {
+			return new ExprAnalyzeResult(StateFunc.of());
+		}
 		Tuple2<ObjectDefinition, StateFunc> dd = nameResolver.searchByName(name);
 
 		if (dd.getField0() != null) {
@@ -703,6 +732,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			} else if (def instanceof VariableDefinition) {
 				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)), name);
 			}
+
+			// if here , it's deferred resultcolumn resolution in
+			// OtherResultColumnResolver
+			return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(def)));
 		}
 
 		return new ExprAnalyzeResult(dd.getField1());
@@ -847,16 +880,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			alias = null;
 		}
 		nameResolver.enterResultColumn(alias);
-		if (alias == null)
-		{
+		if (alias == null) {
 			alias = ctx.ex.getText();
-			// select p1.c1 from p1  , result col name is c1, not p1.c1
-			if (ctx.ex instanceof ExprObjectContext)
-			{
+			// select p1.c1 from p1 , result col name is c1, not p1.c1
+			if (ctx.ex instanceof ExprObjectContext) {
 				int pos = alias.lastIndexOf('.');
-				if (pos!=-1)
-				{
-					alias = alias.substring(pos+1);
+				if (pos != -1) {
+					alias = alias.substring(pos + 1);
 				}
 			}
 		}
@@ -979,7 +1009,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		StateFunc combinedClause = StateFunc.combine(clauses);
 
 		nameResolver.exitSelectStmt(ctx);
-		ss.getColumns().forEach(rc->rc.setExpr(rc.getExpr().addWhereClause(combinedClause)));
+		ss.getColumns().forEach(rc -> rc.setExpr(rc.getExpr().addWhereClause(combinedClause)));
 		return ss;
 
 		// TODO implement "INTO" clause

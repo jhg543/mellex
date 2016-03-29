@@ -22,23 +22,21 @@ import io.github.jhg543.mellex.util.tuple.Tuple2;
 
 public class OneResultColumnResolver {
 
-	
 	private Map<String, ObjectDefinition> aliases = new HashMap<>();
 	private Set<String> currentColumnDependencies;
 	private String currentalias;
 
 	private List<Set<String>> outedges = new ArrayList<>();
-	private SelectStmtData result;	
+	private SelectStmtData result;
 
-	public void collectAlias(List<String> aliasList)
-	{
-		aliasList.forEach(s->
-		{
+	public void collectAlias(List<String> aliasList) {
+		aliasList.forEach(s -> {
 			ObjectDefinition def = new ObjectDefinition();
-			def.setName(this.toString()+"_"+s);
-			aliases.put(s ,def);
+			def.setName(this.toString() + "_" + s);
+			aliases.put(s, def);
 		});
 	}
+
 	/**
 	 * @param alias
 	 *            pass null if no alias
@@ -69,24 +67,33 @@ public class OneResultColumnResolver {
 
 	public Tuple2<ObjectDefinition, StateFunc> searchByName(String name) {
 		if (result == null) {
-			return Tuple2.of(searchNameTemp(name), null);
+			ObjectDefinition def = searchNameTemp(name);
+			if (def == null) {
+				return null;
+			}
+			return Tuple2.of(def, null);
 		} else {
-			return Tuple2.of(null, searchNameAfterRewrite(name));
+			StateFunc func = searchNameAfterRewrite(name);
+			if (func == null) {
+				return null;
+			}
+			return Tuple2.of(null, func);
 		}
 	}
 
-
 	public SelectStmtData rewriteStateFunc(SelectStmtData tempResult) {
 
-		List<ResultColumn> columns = tempResult.getColumns();
+		List<ResultColumn> columns = (List<ResultColumn>) tempResult.getColumns();
 		List<Set<Integer>> outEdgeNumber = outedges.stream()
-				.map(s -> s.stream().map(tempResult.getNameIndexMap()::get).collect(Collectors.toSet())).collect(Collectors.toList());
-		List<StateFunc> newres = columns.stream().map(rc->rc.getExpr()).collect(Collectors.toList());
+				.map(s -> s.stream().map(tempResult.getNameIndexMap()::get).collect(Collectors.toSet()))
+				.collect(Collectors.toList());
+		List<StateFunc> newres = columns.stream().map(rc -> rc.getExpr()).collect(Collectors.toList());
 		Solver solver = new Solver(outEdgeNumber, newres, i -> aliases.get(columns.get(i).getName()));
 		solver.solve();
 
 		List<ResultColumn> newrc = new ArrayList<>();
-		IntStream.range(0, columns.size()).forEach(i -> newrc.add(new ResultColumn(columns.get(i).getName(),columns.get(i).getPosition(),newres.get(i))));
+		IntStream.range(0, columns.size()).forEach(
+				i -> newrc.add(new ResultColumn(columns.get(i).getName(), columns.get(i).getPosition(), newres.get(i))));
 		return new SelectStmtData(newrc);
 	}
 
@@ -106,6 +113,7 @@ public class OneResultColumnResolver {
 			super();
 			this.out = out;
 			this.result = result;
+			this.t = t;
 			Preconditions.checkArgument(out.size() == result.size(), "out and result size not equal");
 			resolveprocess = new int[out.size()];
 		}
@@ -127,7 +135,6 @@ public class OneResultColumnResolver {
 				solve(c);
 			}
 
-			
 			StateFunc s = result.get(i);
 			Map<ObjectDefinition, StateFunc> applyParam = new HashMap<>();
 			out.get(i).forEach(n -> applyParam.put(t.apply(n), result.get(n)));

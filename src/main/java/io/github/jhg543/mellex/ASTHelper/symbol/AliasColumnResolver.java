@@ -76,6 +76,11 @@ public class AliasColumnResolver {
 			scopes.peek().getSubqueries().put(tableName, cte.get(tableName));
 			return;
 		}
+
+		TableDefinition td = tableResolver.apply(tableName);
+		if (td == null) {
+			throw new RuntimeException("Table not found: " + tableName);
+		}
 		scopes.peek().getLiveTables().put(alias == null ? tableName : alias, tableResolver.apply(tableName));
 		// select * from sometable
 
@@ -91,8 +96,8 @@ public class AliasColumnResolver {
 				.flatMap(es -> es.getValue().getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr())));
 
 		Stream<Tuple2<String, StateFunc>> b = s.getLiveTables().entrySet().stream()
-				.flatMap(es -> es.getValue().getColumns().entrySet().stream().map(e -> Tuple2.of(e.getKey(), StateFunc
-						.ofValue(ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition))))));
+				.flatMap(es -> es.getValue().getColumns().stream().map(e -> Tuple2.of(e.getName(), StateFunc
+						.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition))))));
 		return Stream.concat(a, b).collect(Collectors.toList());
 	}
 
@@ -108,11 +113,12 @@ public class AliasColumnResolver {
 		TableDefinition td = s.liveTables.get(tableName);
 
 		// TODO if td def not exist?
+		
 		if (td != null) {
-			return td.getColumns().entrySet().stream()
-					.map(e -> Tuple2.of(e.getKey(),
+			return td.getColumns().stream()
+					.map(e -> Tuple2.of(e.getName(),
 							StateFunc.ofValue(
-									ValueFunc.of(new ObjectReference(e.getValue(), fileName, lineNumber, charPosition)))))
+									ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition)))))
 					.collect(Collectors.toList());
 		}
 
@@ -152,7 +158,7 @@ public class AliasColumnResolver {
 			}
 
 			for (Entry<String, TableDefinition> e : s.getLiveTables().entrySet()) {
-				ColumnDefinition cd = e.getValue().getColumns().get(name);
+				ColumnDefinition cd = e.getValue().getColumnByName(name);
 				if (cd != null) {
 					if (result != null) {
 						throw new IllegalStateException(
@@ -185,6 +191,7 @@ public class AliasColumnResolver {
 				return Tuple2.of(null, inf);
 			} else {
 				// if it's a table, leave it to globalObjectResolver
+				// TODO it will pass even if not in the "from" list
 				return null;
 			}
 
@@ -206,12 +213,15 @@ public class AliasColumnResolver {
 		if (scopes.isEmpty()) {
 			return null;
 		}
+		if (CharMatcher.is('.').matchesAnyOf(name)) {
+			return null;
+		}
 		Scope s = scopes.peek();
 		if (s.getSubqueries().size() == 0 && s.getLiveTables().size() == 1) {
 			Entry<String, TableDefinition> e = s.getLiveTables().entrySet().iterator().next();
-			ColumnDefinition cd = new ColumnDefinition(e.getKey());
+			ColumnDefinition cd = new ColumnDefinition("[Guess]" + e.getKey() + "." + name,-1);
 			cd.setInfered(true);
-			e.getValue().getColumns().put(e.getKey(), cd);
+			// e.getValue().getColumns().put(name, cd);
 			return cd;
 		} else {
 			return null;

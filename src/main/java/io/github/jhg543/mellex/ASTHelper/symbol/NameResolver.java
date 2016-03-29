@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.google.common.base.Preconditions;
 
+import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
@@ -36,7 +37,29 @@ public class NameResolver {
 		}
 
 	}
+	/**
+	 * 
+	 * @param name
+	 * @return not found = null
+	 */
+	public FunctionDefinition searchFunction(String name) {
+		ObjectDefinition result = local.searchByName(name);
+		if (result != null && result instanceof FunctionDefinition) {
+			return (FunctionDefinition) result;
+		}
 
+		result = global.searchByName(name);
+		if (result != null && result instanceof FunctionDefinition) {
+			return (FunctionDefinition) result;
+		}
+		return null;
+		
+	}
+	/**
+	 * 
+	 * @param name
+	 * @return not found = throw exception
+	 */
 	public Tuple2<ObjectDefinition,StateFunc> searchByName(String name) {
 		Object result;
 

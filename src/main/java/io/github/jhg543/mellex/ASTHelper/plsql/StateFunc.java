@@ -3,6 +3,7 @@ package io.github.jhg543.mellex.ASTHelper.plsql;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -30,8 +31,8 @@ public class StateFunc {
 														// since used in result
 														// column
 	/**
-	 * For Select it's "where ... having... order...." clause, For expr it's only come
-	 * from inline select stmt For Function def it's
+	 * For Select it's "where ... having... order...." clause, For expr it's
+	 * only come from inline select stmt For Function def it's
 	 * 
 	 */
 	protected ValueFunc branchCond;
@@ -262,33 +263,79 @@ public class StateFunc {
 		return m1;
 	}
 
+	/**
+	 * used in "exists"
+	 * 
+	 * @param subs
+	 * @return
+	 */
+	public static StateFunc combineNoValue(List<StateFunc> subs) {
+		StateFunc m1 = combine(subs);
+		m1.value = ValueFunc.of();
+		return m1;
+	}
+
+	public static StateFunc combineInsertOrUpdate(List<ColumnDefinition> defs, List<StateFunc> subs) {
+		subs = new ArrayList<>(subs);
+		subs.removeIf(s -> s.equals(StateFunc.of()));
+
+		StateFunc result = new StateFunc();
+		result.value = ValueFunc.of();
+		result.branchCond = combineValue(subs.stream().map(s -> s.branchCond).collect(toList()));
+		result.assigns = combineAssigns(subs.stream().map(s -> s.assigns).collect(toList()));
+		List<Map<ObjectDefinition, ValueFunc>> updatesList = new ArrayList<>();
+		subs.stream().forEach(s -> updatesList.add(s.updates));
+		Map<ObjectDefinition, ValueFunc> ass = new HashMap<>();
+		for (int i = 0; i < defs.size(); ++i) {
+			ass.put(defs.get(i), subs.get(i).getValue());
+		}
+		updatesList.add(ass);
+		result.updates = combineAssigns(updatesList);
+		return result;
+	}
+
+	public static StateFunc combineSelectInto(List<VariableDefinition> defs, List<StateFunc> subs) {
+		subs = new ArrayList<>(subs);
+		subs.removeIf(s -> s.equals(StateFunc.of()));
+
+		StateFunc result = new StateFunc();
+		result.value = ValueFunc.of();
+		result.branchCond = combineValue(subs.stream().map(s -> s.branchCond).collect(toList()));
+		result.updates = combineAssigns(subs.stream().map(s -> s.updates).collect(toList()));
+		List<Map<ObjectDefinition, ValueFunc>> assignsList = new ArrayList<>();
+		subs.stream().forEach(s -> assignsList.add(s.assigns));
+		Map<ObjectDefinition, ValueFunc> ass = new HashMap<>();
+		for (int i = 0; i < defs.size(); ++i) {
+			ass.put(defs.get(i), subs.get(i).getValue());
+		}
+		assignsList.add(ass);
+		result.assigns = combineAssigns(assignsList);
+		return result;
+	}	
+	
 	@Override
 	public String toString() {
 		String sb = "StateFunc [";
-		if (!value.isEmpty())
-		{
-			sb+=" value=";
-			sb+=value;
+		if (!value.isEmpty()) {
+			sb += " value=";
+			sb += value;
 		}
-		
-		if (!branchCond.isEmpty())
-		{
-			sb+=" branchCond=";
-			sb+=branchCond;
+
+		if (!branchCond.isEmpty()) {
+			sb += " branchCond=";
+			sb += branchCond;
 		}
-		if (!updates.isEmpty())
-		{
-			sb+=" updates=";
-			sb+=updates;
+		if (!updates.isEmpty()) {
+			sb += " updates=";
+			sb += updates;
 		}
-		
-		if (!assigns.isEmpty())
-		{
-			sb+=" assigns=";
-			sb+=assigns;
+
+		if (!assigns.isEmpty()) {
+			sb += " assigns=";
+			sb += assigns;
 		}
-		
-		sb+="]";
+
+		sb += "]";
 		return sb;
 	}
 

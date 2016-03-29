@@ -1,5 +1,6 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,11 +9,15 @@ import java.util.stream.IntStream;
 import com.google.common.base.Preconditions;
 
 public class SelectStmtData {
-	private List<ResultColumn> columns;
-	private Map<String, Integer> nameIndexMap; // index is 0 based
+	protected List<ResultColumn> columns;
+	protected Map<String, Integer> nameIndexMap; // index is 0 based
 
+	/**
+	 * do not modify it.
+	 * @return
+	 */
 	public List<ResultColumn> getColumns() {
-		return columns;
+		return Collections.unmodifiableList(columns);
 	}
 
 	/**
@@ -27,9 +32,13 @@ public class SelectStmtData {
 	public StateFunc getColumnExprFunc(String name) {
 		return getColumnExprFunc(nameIndexMap.get(name));
 	}
-
+	
+	/**
+	 * do not modify the result collection
+	 * @return
+	 */
 	public Map<String, Integer> getNameIndexMap() {
-		return nameIndexMap;
+		return Collections.unmodifiableMap(nameIndexMap);
 	}
 
 	public SelectStmtData(List<ResultColumn> columns) {

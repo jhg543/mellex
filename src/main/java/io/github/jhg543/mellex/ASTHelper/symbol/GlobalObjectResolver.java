@@ -38,7 +38,8 @@ public class GlobalObjectResolver {
 			return fd;
 		}
 
-		// TODO what if no dot in name?
+		
+//		// TODO what if no dot in name?
 		Tuple2<String, String> namesplit = splitLastDot(name);
 
 		if (namesplit == null) {
@@ -48,7 +49,7 @@ public class GlobalObjectResolver {
 		if (td == null) {
 			return null;
 		}
-		return td.getColumns().get(namesplit.getField1());
+		return td.getColumnByName(namesplit.getField1());
 	}
 
 	public TableDefinition searchTable(String name) {

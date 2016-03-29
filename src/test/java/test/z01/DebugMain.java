@@ -50,16 +50,17 @@ public class DebugMain {
 	private void printInstBuffer(InstBuffer buffer) {
 		for (Instruction<VariableUsageState> inst : buffer.getInstbuffer()) {
 			Object obj = inst.getDebugInfo();
-			if (obj instanceof SelectStmtData) {
-				SelectStmtData ss = (SelectStmtData) obj;
-				System.out.println(ss.toString());
-			}
+			System.out.println(obj.toString());
+//			if (obj instanceof SelectStmtData) {
+//				SelectStmtData ss = (SelectStmtData) obj;
+//				System.out.println(ss.toString());
+//			}
 		}
 	}
 
 	
 	public void debug() {
-		printInstBuffer(generateInst(GetSql("s010.sql")));
+		printInstBuffer(generateInst(GetSql("s011.sql")));
 	}
 	
 	public static void main(String[] args) throws Exception {

@@ -807,7 +807,6 @@ returns [ Influences inf , ObjectName objname ]
  | ( ( K_NOT )? isexists=K_EXISTS )? '(' ss=select_stmt ')' #exprExists
  | K_CASE ex+=expr? ( K_WHEN ex+=expr K_THEN ax+=expr )+ ( K_ELSE ax+=expr )? K_END #exprCase
 
- | operand1=expr '(' ( K_CASESPECIFIC  | K_TITLE STRING_LITERAL )')' /*unary*/ #expr1
  | operand1=expr interval_def /* WTF IS THIS DATE CONVERSION */ /*unary*/ #expr1
  | operand1=expr '(' data_attribute ')' /*unary*/  #expr1
  | operand1=expr '(' ( K_MONTH | K_DATE | K_CHAR | K_INTEGER | K_DECIMAL ) ('(' NUMERIC_LITERAL( ',' NUMERIC_LITERAL)? ')' )? ')'/*unary*/  #expr1 // IMPLICIT CONVERSION
@@ -918,8 +917,12 @@ result_column
 returns [ ResultColumn rc ]
  : '*' #result_columnAsterisk
  | tn=table_name '.' '*' #result_columnTableAsterisk
- | ex=expr ( K_AS? ca=column_alias )? #result_columnExpr
+ | ex=expr td_result_column_modifier? ( K_AS? ca=column_alias )? #result_columnExpr
  ;
+
+td_result_column_modifier:
+'(' ( K_CASESPECIFIC  | K_TITLE STRING_LITERAL )')'
+;
 
 table_or_subquery
 returns [ SubQuery q = new SubQuery() ]

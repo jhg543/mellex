@@ -37,7 +37,7 @@ public class StateTransformTest {
 			v[i] = new VariableDefinition();
 			v[i].setName("v" + i);
 			r[i] = new ObjectReference(null,null,0,0);
-			c[i] = new ColumnDefinition("c" + i);
+			c[i] = new ColumnDefinition("c" + i,-1);
 			r[i].setObjectDefinition(c[i]);
 		});
 
