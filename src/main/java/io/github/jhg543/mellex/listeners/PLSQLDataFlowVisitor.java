@@ -123,12 +123,15 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			str = str.substring(0, i + 1) + str.substring(i + 2);
 		return str;
 	}
+
 	private static String escape_sql_literal(String text) {
 		return compressQuotes(text.substring(1, text.length() - 1), "''");
 	}
+
 	private static StateFunc funcOfExpr(Object expr) {
 		return ((ExprAnalyzeResult) expr).getTransformation();
 	}
+
 	private TableDefinitionProvider provider;
 	private NameResolver nameResolver;
 	private TokenStream stream;
@@ -175,11 +178,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	public PatchList visitCase_statement(Case_statementContext ctx) {
 		PatchList p = new PatchList();
 		if (ctx.selector != null && !ctx.selector.inf.isempty()) {
-			Instruction<State> ins = new Instruction<State>("null");
+			Instruction ins = new Instruction("null");
 			ins.setDebugInfo(ctx.getStart().getLine());
 			Influences inf = ctx.selector.inf;
 			ins.setFunc(state -> {
-				State v = state.shallowCopy();
+				
 
 				return null;
 			});
@@ -289,7 +292,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 				}
 				nameResolver.defineTable(tableName, def);
 				if (!ctx.st.nodata) {
-					instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
+					instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
 
 				}
 			} else {
@@ -301,7 +304,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 				}
 				nameResolver.defineTable(tableName, def);
 				if (!ctx.st.nodata) {
-					instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
+					instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
 				}
 			}
 		}
@@ -332,7 +335,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		}
 
-		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(),
+		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(),
 				selectStmt.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()))));
 
 		return null;
@@ -492,7 +495,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 						ctx.getStart().getCharPositionInLine());
 				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
 			} else if (def instanceof VariableDefinition) {
-				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)), name);
+				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)),(VariableDefinition) def);
 			}
 
 			// if here , it's deferred resultcolumn resolution in
@@ -507,11 +510,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	public ExprAnalyzeResult visitExprOR(ExprORContext ctx) {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		String literalValue = null;
-		if (e1.getLiteralValue() != null && e2.getLiteralValue() != null) {
-			literalValue = e1.getLiteralValue() + e2.getLiteralValue();
+
+		if (!e1.getLiteralValue().isEmpty() && !e2.getLiteralValue().isEmpty()) {
+			List<Object> literalValue = null;
+			literalValue = new LinkedList<>();
+			literalValue.addAll(e1.getLiteralValue());
+			literalValue.addAll(e2.getLiteralValue());
+			return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()), literalValue);
+		} else {
+			return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
 		}
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()), literalValue);
 
 	}
 
@@ -594,7 +602,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		Preconditions.checkState(cdefs.size() == exprs.size(), "Column size %d != expr size %d", cdefs.size(), exprs.size());
 		// TODO REMOVE SELF ASSIGN FROM LIST
 
-		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
 		return null;
 	}
 
@@ -607,8 +615,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
 		PatchList patchList = new PatchList();
-		patchList.setBreakList(new ArrayList<Instruction<State>>());
-		patchList.setContinueList(new ArrayList<Instruction<State>>());
+		patchList.setBreakList(new ArrayList<Instruction>());
+		patchList.setContinueList(new ArrayList<Instruction>());
 
 		PatchList prevpl = null;
 		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
@@ -616,7 +624,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			patchList.getBreakList().addAll(currentpl.getBreakList());
 			patchList.getContinueList().addAll(currentpl.getContinueList());
 			if (prevpl != null) {
-				for (Instruction<State> ins : prevpl.getNextList()) {
+				for (Instruction ins : prevpl.getNextList()) {
 					ins.getNextPc().add(() -> currentpl.getStartInstruction());
 				}
 			} else {
@@ -637,7 +645,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
 		SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
-		instbuffer.add(new Instruction<>(ss));
+		instbuffer.add(new Instruction(ss));
 		return null;
 	}
 
@@ -1000,7 +1008,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		nameResolver.exitSelectStmt(ctx);
 
-		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
 		return null;
 	}
 
@@ -1012,9 +1020,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public PatchList visitWhile_loop_statement(While_loop_statementContext ctx) {
-		StateFunc exprf = funcOfExpr(ctx.expr().accept(this));
+		StateFunc exprf = StateFunc.of().addWhereClause(funcOfExpr(ctx.expr().accept(this)));
+		
+		
 		return null;
 	}
+
 	@Override
 	public VariableDefinition visitVariable_declaration(Variable_declarationContext ctx) {
 		// COPY FROM visitParameter_declaration

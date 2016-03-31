@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
@@ -26,7 +27,7 @@ import static java.util.stream.Collectors.*;
  */
 public class StateFunc {
 	protected ValueFunc value;
-	protected Map<ObjectDefinition, ValueFunc> updates;
+	protected Map<ObjectDefinition, FilteredValueFunc> updates;
 	protected Map<ObjectDefinition, ValueFunc> assigns; // should be ordered map
 														// since used in result
 														// column
@@ -41,7 +42,7 @@ public class StateFunc {
 		return value;
 	}
 
-	public Map<ObjectDefinition, ValueFunc> getUpdates() {
+	public Map<ObjectDefinition, FilteredValueFunc> getUpdates() {
 		return updates;
 	}
 
@@ -58,30 +59,25 @@ public class StateFunc {
 	 * @return combined sets (immutable)
 	 */
 	private static ValueFunc combineValue(List<ValueFunc> subs) {
-		subs = new ArrayList<>(subs);
-		subs.removeIf(v -> v.equals(ValueFunc.of()));
 
-		if (subs.size() == 0) {
-			return ValueFunc.of();
+		ValueFunc.Builder builder = new ValueFunc.Builder();
+		for (ValueFunc fn : subs) {
+			builder.add(fn);
 		}
-		for (int i = subs.size() - 1; i > 0; --i) {
-			if (subs.get(0) == subs.get(i)) {
-				subs.remove(i);
-			}
+
+		return builder.Build();
+
+	}
+	
+	private static FilteredValueFunc combineFilteredValue(List<FilteredValueFunc> subs) {
+
+		ValueFunc.Builder values = new ValueFunc.Builder();
+		ValueFunc.Builder filters = new ValueFunc.Builder();
+		for (FilteredValueFunc fn : subs) {
+			values.add(fn.getValue());
+			filters.add(fn.getFilter());
 		}
-		if (subs.size() == 1) {
-			return subs.get(0);
-		}
-		ImmutableSet.Builder<ObjectReference> objs = ImmutableSet.builder();
-		ImmutableSet.Builder<ObjectDefinition> params = ImmutableSet.builder();
-		subs.forEach(s -> {
-			objs.addAll(s.getObjects());
-			params.addAll(s.getParameters());
-		});
-		ValueFunc result = new ValueFunc();
-		result.setObjects(objs.build());
-		result.setParameters(params.build());
-		return result;
+		return new FilteredValueFunc(values.Build(), filters.Build());
 
 	}
 
@@ -92,6 +88,14 @@ public class StateFunc {
 	 * @return
 	 */
 	private static Map<ObjectDefinition, ValueFunc> combineAssigns(List<Map<ObjectDefinition, ValueFunc>> subs) {
+		return combineMap(subs,StateFunc::combineValue);
+	}
+
+	private static Map<ObjectDefinition, FilteredValueFunc> combineUpdates(List<Map<ObjectDefinition, FilteredValueFunc>> subs) {
+		return combineMap(subs,StateFunc::combineFilteredValue);
+	}
+	
+	private static <K,V> Map<K, V> combineMap(List<Map<K, V>> subs,Function<List<V>,V> valueCombiner) {
 		subs = new ArrayList<>(subs);
 		subs.removeIf(Map::isEmpty);
 
@@ -102,16 +106,15 @@ public class StateFunc {
 		if (subs.size() == 1) {
 			return subs.get(0);
 		}
-
-		ImmutableMap.Builder<ObjectDefinition, ValueFunc> as = ImmutableMap.builder();
+		
+		ImmutableMap.Builder<K, V> as = ImmutableMap.builder();
 		subs.stream().flatMap(s -> s.entrySet().stream())
 				.collect(groupingBy(e -> e.getKey(), mapping(e -> e.getValue(), toList())))
-				.forEach((k, v) -> as.put(k, combineValue(v)));
+				.forEach((k, v) -> as.put(k, valueCombiner.apply(v)));
 		;
 
 		return as.build();
-
-	}
+	}	
 
 	public static StateFunc combine(List<StateFunc> subs) {
 		subs = new ArrayList<>(subs);
@@ -124,7 +127,7 @@ public class StateFunc {
 		result.value = combineValue(subs.stream().map(s -> s.value).collect(toList()));
 		result.branchCond = combineValue(subs.stream().map(s -> s.branchCond).collect(toList()));
 		result.assigns = combineAssigns(subs.stream().map(s -> s.assigns).collect(toList()));
-		result.updates = combineAssigns(subs.stream().map(s -> s.updates).collect(toList()));
+		result.updates = combineUpdates(subs.stream().map(s -> s.updates).collect(toList()));
 		return result;
 	}
 
@@ -159,7 +162,7 @@ public class StateFunc {
 		return s;
 	}
 
-	public static StateFunc ofUpdate(Map<ObjectDefinition, ValueFunc> updates) {
+	public static StateFunc ofUpdate(Map<ObjectDefinition, FilteredValueFunc> updates) {
 		StateFunc s = createEmpty();
 		s.updates = updates;
 		return s;
@@ -190,16 +193,11 @@ public class StateFunc {
 		if (nochange) {
 			return v;
 		} else {
-			ValueFunc result = new ValueFunc();
-			result.setParameters(params.build());
 			Set<ObjectReference> so = objs.build();
-			if (so.size() != v.getObjects().size()) {
-				result.setObjects(objs.build());
-			} else {
-				result.setObjects(v.getObjects());
+			if (so.size() == v.getObjects().size()) {
+				so = v.getObjects();
 			}
-
-			return result;
+			return ValueFunc.of(params.build(), so);
 		}
 	}
 
@@ -258,7 +256,7 @@ public class StateFunc {
 		StateFunc m1 = new StateFunc();
 		m1.value = this.value;
 		m1.assigns = combineAssigns(ImmutableList.of(this.assigns, clause.assigns));
-		m1.updates = combineAssigns(ImmutableList.of(this.updates, clause.updates));
+		m1.updates = combineUpdates(ImmutableList.of(this.updates, clause.updates));
 		m1.branchCond = combineValue(ImmutableList.of(this.branchCond, clause.value, clause.branchCond));
 		return m1;
 	}
@@ -276,43 +274,13 @@ public class StateFunc {
 	}
 
 	public static StateFunc combineInsertOrUpdate(List<ColumnDefinition> defs, List<StateFunc> subs) {
-		subs = new ArrayList<>(subs);
-		subs.removeIf(s -> s.equals(StateFunc.of()));
-
-		StateFunc result = new StateFunc();
-		result.value = ValueFunc.of();
-		result.branchCond = combineValue(subs.stream().map(s -> s.branchCond).collect(toList()));
-		result.assigns = combineAssigns(subs.stream().map(s -> s.assigns).collect(toList()));
-		List<Map<ObjectDefinition, ValueFunc>> updatesList = new ArrayList<>();
-		subs.stream().forEach(s -> updatesList.add(s.updates));
-		Map<ObjectDefinition, ValueFunc> ass = new HashMap<>();
-		for (int i = 0; i < defs.size(); ++i) {
-			ass.put(defs.get(i), subs.get(i).getValue());
-		}
-		updatesList.add(ass);
-		result.updates = combineAssigns(updatesList);
-		return result;
+		throw new RuntimeException("not implemented");
 	}
 
 	public static StateFunc combineSelectInto(List<VariableDefinition> defs, List<StateFunc> subs) {
-		subs = new ArrayList<>(subs);
-		subs.removeIf(s -> s.equals(StateFunc.of()));
+		throw new RuntimeException("not implemented");
+	}
 
-		StateFunc result = new StateFunc();
-		result.value = ValueFunc.of();
-		result.branchCond = combineValue(subs.stream().map(s -> s.branchCond).collect(toList()));
-		result.updates = combineAssigns(subs.stream().map(s -> s.updates).collect(toList()));
-		List<Map<ObjectDefinition, ValueFunc>> assignsList = new ArrayList<>();
-		subs.stream().forEach(s -> assignsList.add(s.assigns));
-		Map<ObjectDefinition, ValueFunc> ass = new HashMap<>();
-		for (int i = 0; i < defs.size(); ++i) {
-			ass.put(defs.get(i), subs.get(i).getValue());
-		}
-		assignsList.add(ass);
-		result.assigns = combineAssigns(assignsList);
-		return result;
-	}	
-	
 	@Override
 	public String toString() {
 		String sb = "StateFunc [";

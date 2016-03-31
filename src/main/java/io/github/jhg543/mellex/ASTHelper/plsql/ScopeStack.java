@@ -20,7 +20,7 @@ public class ScopeStack {
 
 	private Map<String, ObjectDefinition> cache;
 
-	private Map<String, Instruction<State>> labels;
+	private Map<String, Instruction> labels;
 	
 	private Deque<ControlBlock> blocks;
 
@@ -30,7 +30,7 @@ public class ScopeStack {
 		blocks = new LinkedList<ControlBlock>();
 		stack = new LinkedList<ControlBlock>();
 		cache = new HashMap<String, ObjectDefinition>();
-		labels = new HashMap<String, Instruction<State>>();
+		labels = new HashMap<String, Instruction>();
 		blocks.push(ROOT);
 	}
 
@@ -106,7 +106,7 @@ public class ScopeStack {
 		return null;
 	}
 
-	public Map<String, Instruction<State>> getLabels() {
+	public Map<String, Instruction> getLabels() {
 		return labels;
 	}
 	

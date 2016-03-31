@@ -4,17 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class InstBuffer {
-	private List<Instruction<State>> instbuffer = new ArrayList<>();
+	private List<Instruction> instbuffer = new ArrayList<>();
 
-	public List<Instruction<State>> getInstbuffer() {
+	public List<Instruction> getInstbuffer() {
 		return instbuffer;
 	}
 
-	public void setInstbuffer(List<Instruction<State>> instbuffer) {
+	public void setInstbuffer(List<Instruction> instbuffer) {
 		this.instbuffer = instbuffer;
 	}
 	
-	public void add(Instruction<State> inst)
+	public void add(Instruction inst)
 	{
 		instbuffer.add(inst);
 	}
