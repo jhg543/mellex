@@ -52,6 +52,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Create_view_stmtCon
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Cursor_definitionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Declare_sectionContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Declare_section_onelineContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Delete_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr1Context;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr2Context;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Expr2poiContext;
@@ -102,12 +103,13 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Update_stmt_fromCon
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Update_stmt_setContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Variable_declarationContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Where_clauseContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.While_loop_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.WindowContext;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.flowmfp.InstBuffer;
 import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
 import io.github.jhg543.mellex.listeners.flowmfp.PatchList;
-import io.github.jhg543.mellex.listeners.flowmfp.VariableUsageState;
+import io.github.jhg543.mellex.listeners.flowmfp.State;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.Misc;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
@@ -115,21 +117,107 @@ import io.github.jhg543.mellex.util.tuple.Tuple2;
 @SuppressWarnings("unchecked")
 public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
+	private static String compressQuotes(String paramString1, String paramString2) {
+		String str = paramString1;
+		for (int i = str.indexOf(paramString2); i != -1; i = str.indexOf(paramString2, i + 1))
+			str = str.substring(0, i + 1) + str.substring(i + 2);
+		return str;
+	}
+	private static String escape_sql_literal(String text) {
+		return compressQuotes(text.substring(1, text.length() - 1), "''");
+	}
+	private static StateFunc funcOfExpr(Object expr) {
+		return ((ExprAnalyzeResult) expr).getTransformation();
+	}
 	private TableDefinitionProvider provider;
 	private NameResolver nameResolver;
 	private TokenStream stream;
 	private String current_sql;
 	private String current_file;
 	private InstBuffer instbuffer;
+	private boolean metaGuessEnabled = true;
 
 	private ScopeStack scopeStack;
+
+	public PLSQLDataFlowVisitor(TokenStream stream, InstBuffer instbuffer, DatabaseVendor vendor, boolean metaGuessEnabled) {
+		super();
+
+		this.stream = stream;
+		this.instbuffer = instbuffer;
+		this.metaGuessEnabled = metaGuessEnabled;
+		this.nameResolver = new NameResolver(vendor, new TableStorage(), metaGuessEnabled);
+	}
+
+	private void exitObject_name(Object_nameContext ctx) {
+		ObjectName name = new ObjectName();
+		for (Any_nameContext s : ctx.d) {
+			name.ns.add(s.getText());
+		}
+		ctx.objname = name;
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T extends RuleContext> T getInvokingRule(RuleContext ctx, Class<T> clz) {
+		RuleContext context = ctx;
+		while (!(clz.isInstance(context))) {
+			context = context.parent;
+			// throwing NPE here = root reached it should not happen
+		}
+		return (T) context;
+
+	}
 
 	private String getText(RuleContext ctx) {
 		return stream.getText(ctx.getSourceInterval());
 	}
 
-	private static StateFunc funcOfExpr(Object expr) {
-		return ((ExprAnalyzeResult) expr).getTransformation();
+	@Override
+	public PatchList visitCase_statement(Case_statementContext ctx) {
+		PatchList p = new PatchList();
+		if (ctx.selector != null && !ctx.selector.inf.isempty()) {
+			Instruction<State> ins = new Instruction<State>("null");
+			ins.setDebugInfo(ctx.getStart().getLine());
+			Influences inf = ctx.selector.inf;
+			ins.setFunc(state -> {
+				State v = state.shallowCopy();
+
+				return null;
+			});
+			p.setStartInstruction(ins);
+		}
+
+		return null;
+	}
+
+	@Override
+	public String visitColumn_def(Column_defContext ctx) {
+		return ctx.cn.getText();
+	}
+
+	@Override
+	public List<String> visitColumn_defs(Column_defsContext ctx) {
+		List<String> colnames = new ArrayList<>();
+
+		for (Column_defContext cd : ctx.cd) {
+			colnames.add((String) cd.accept(this));
+		}
+
+		return colnames;
+	}
+
+	@Override
+	public Tuple2<String, SelectStmtData> visitCommon_table_expression(Common_table_expressionContext ctx) {
+		SelectStmtData data = (SelectStmtData) ctx.ss.accept(this);
+		if (ctx.cn.size() > 0) {
+			Preconditions.checkState(data.getColumns().size() == ctx.cn.size(), "CTE column size mismatch");
+			List<ResultColumn> results = new ArrayList<>();
+			for (int i = 0; i < ctx.cn.size(); ++i) {
+				results.add(new ResultColumn(ctx.cn.get(i).getText(), i, data.getColumnExprFunc(i)));
+			}
+			data = new SelectStmtData(results);
+		}
+
+		return Tuple2.of(ctx.tn.getText(), data);
 	}
 
 	@Override
@@ -164,90 +252,89 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public PatchList visitCase_statement(Case_statementContext ctx) {
-		PatchList p = new PatchList();
-		if (ctx.selector != null && !ctx.selector.inf.isempty()) {
-			Instruction<VariableUsageState> ins = new Instruction<VariableUsageState>("null");
-			ins.setDebugInfo(ctx.getStart().getLine());
-			Influences inf = ctx.selector.inf;
-			ins.setFunc(state -> {
-				VariableUsageState v = state.shallowCopy();
-
-				return null;
-			});
-			p.setStartInstruction(ins);
+	public Object visitCreate_source_table(Create_source_tableContext ctx) {
+		if (ctx.ss != null) {
+			return ctx.ss.accept(this);
 		}
 
+		return ctx.obj.getText();
+	}
+
+	@Override
+	public Object visitCreate_table_stmt(Create_table_stmtContext ctx) {
+		// TODO the source table data
+		String tableName = ctx.obj.getText();
+		TableDefinition def = new TableDefinition(tableName, ctx.isvolatile, false);
+
+		if (Misc.isvolatile(tableName)) {
+			def.setSessionScoped(true);
+		}
+		if (ctx.def != null) {
+			List<String> colnames = (List<String>) ctx.def.accept(this);
+			for (String colname : colnames) {
+				def.addColumn(colname);
+
+			}
+			nameResolver.defineTable(tableName, def);
+		} else {
+			Object ss = ctx.st.accept(this);
+			if (ss instanceof String) {
+				TableDefinition sourceTableDef = nameResolver.searchTable((String) ss);
+				List<StateFunc> subs = new ArrayList<>();
+				for (ColumnDefinition srcColDef : sourceTableDef.getColumns()) {
+
+					def.addColumn(srcColDef.getName());
+					subs.add(StateFunc.ofValue(ValueFunc.of(new ObjectReference(srcColDef, current_file,
+							ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()))));
+				}
+				nameResolver.defineTable(tableName, def);
+				if (!ctx.st.nodata) {
+					instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
+
+				}
+			} else {
+				SelectStmtData selectStmt = (SelectStmtData) ss;
+				List<StateFunc> subs = new ArrayList<>();
+				for (ResultColumn rc : selectStmt.getColumns()) {
+					def.addColumn(rc.getName());
+					subs.add(rc.getExpr());
+				}
+				nameResolver.defineTable(tableName, def);
+				if (!ctx.st.nodata) {
+					instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
+				}
+			}
+		}
 		return null;
 	}
 
 	@Override
-	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
-		PatchList patchList = new PatchList();
-		patchList.setBreakList(new ArrayList<Instruction<VariableUsageState>>());
-		patchList.setContinueList(new ArrayList<Instruction<VariableUsageState>>());
+	public Object visitCreate_view_stmt(Create_view_stmtContext ctx) {
+		// TODO the source table data
+		String tableName = ctx.obj.getText();
 
-		PatchList prevpl = null;
-		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
-			PatchList currentpl = (PatchList) plsqlctx.accept(this);
-			patchList.getBreakList().addAll(currentpl.getBreakList());
-			patchList.getContinueList().addAll(currentpl.getContinueList());
-			if (prevpl != null) {
-				for (Instruction<VariableUsageState> ins : prevpl.getNextList()) {
-					ins.getNextPc().add(() -> currentpl.getStartInstruction());
-				}
-			} else {
-				patchList.setStartInstruction(currentpl.getStartInstruction());
+		TableDefinition def = new TableDefinition(tableName, false, false);
+		def.setName(tableName);
+		SelectStmtData selectStmt = (SelectStmtData) ctx.ss.accept(this);
+
+		if (ctx.cn.size() > 0) {
+			List<String> colnames = new ArrayList<>();
+			for (Column_nameContext colctx : ctx.cn) {
+				colnames.add(colctx.getText());
 			}
-			prevpl = currentpl;
+			nameResolver.defineTable(tableName, def);
+		} else {
+
+			for (ResultColumn rc : selectStmt.getColumns()) {
+				def.addColumn(rc.getName());
+			}
+			nameResolver.defineTable(tableName, def);
+
 		}
-		patchList.setNextList(prevpl.getNextList());
-		if (patchList.getBreakList().isEmpty()) {
-			patchList.setBreakList(Collections.EMPTY_LIST);
-		}
-		if (patchList.getContinueList().isEmpty()) {
-			patchList.setContinueList(Collections.EMPTY_LIST);
-		}
-		return patchList;
-	}
 
-	@Override
-	public PatchList visitPlsql_statement(Plsql_statementContext ctx) {
-		PatchList patchList = (PatchList) ctx.plsql_statement_nolabel().accept(this);
-		for (LabelContext labelctx : ctx.label()) {
-			String labelName = (String) labelctx.label_name().getText();
-			scopeStack.getLabels().put(labelName, patchList.getStartInstruction());
-		}
-		return patchList;
-	}
+		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(def.getColumns(),
+				selectStmt.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()))));
 
-	@Override
-	public PatchList visitPlsql_statement_nolabel(Plsql_statement_nolabelContext ctx) {
-		return (PatchList) visitChildren(ctx);
-	}
-
-	@Override
-	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
-		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
-		for (Declare_section_onelineContext vd : ctx.declare_section_oneline()) {
-			decls.add((ObjectDefinition) vd.accept(this));
-		}
-		return decls;
-	}
-
-	@Override
-	public ObjectDefinition visitDeclare_section_oneline(Declare_section_onelineContext ctx) {
-		return (ObjectDefinition) visitChildren(ctx);
-	}
-
-	@Override
-	public Object visitProcedure_or_function_declaration(Procedure_or_function_declarationContext ctx) {
-		throw new UnsupportedOperationException("FORWARD DECLARATION NOT SUPPORTED");
-	}
-
-	@Override
-	public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
@@ -273,388 +360,54 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public VariableDefinition visitVariable_declaration(Variable_declarationContext ctx) {
-		// COPY FROM visitParameter_declaration
-
-		VariableDefinition def = new VariableDefinition();
-		def.setName(ctx.any_name().getText());
-		// def.setConst(ctx.K_CONSTANT() != null);
-		ExprContext exprContext = ctx.expr();
-		if (exprContext != null) {
-			// TODO deal with expr
+	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
+		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
+		for (Declare_section_onelineContext vd : ctx.declare_section_oneline()) {
+			decls.add((ObjectDefinition) vd.accept(this));
 		}
-
-		return def;
+		return decls;
 	}
 
 	@Override
-	public List<VariableDefinition> visitParameter_declarations(Parameter_declarationsContext ctx) {
-		List<VariableDefinition> defs = new ArrayList<VariableDefinition>();
-		for (Parameter_declarationContext vd : ctx.parameter_declaration()) {
-			defs.add((VariableDefinition) vd.accept(this));
-		}
-		return defs;
+	public ObjectDefinition visitDeclare_section_oneline(Declare_section_onelineContext ctx) {
+		return (ObjectDefinition) visitChildren(ctx);
 	}
 
 	@Override
-	public VariableDefinition visitParameter_declaration(Parameter_declarationContext ctx) {
-		if (ctx.K_OUT() != null) {
-			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
-		}
-		VariableDefinition def = new VariableDefinition();
-		def.setName(ctx.any_name().getText());
-		ExprContext exprContext = ctx.expr();
-		if (exprContext != null) {
-			// TODO deal with expr
-		}
-		return def;
+	public Object visitDelete_stmt(Delete_stmtContext ctx) {
+		return null; // TODO fill delete stmt
 	}
 
 	@Override
-	public Object visitSql_stmt(Sql_stmtContext ctx) {
-		current_sql = stream.getText(ctx.getSourceInterval());
-		visitChildren(ctx);
-		return null;
+	public ExprAnalyzeResult visitExpr1(Expr1Context ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
 	}
 
-	public PLSQLDataFlowVisitor(TokenStream stream, InstBuffer instbuffer, DatabaseVendor vendor) {
-		super();
+	@Override
+	public ExprAnalyzeResult visitExpr2(Expr2Context ctx) {
 
-		this.stream = stream;
-		this.instbuffer = instbuffer;
-		this.nameResolver = new NameResolver(vendor, new TableStorage());
-	}
-
-	@SuppressWarnings("unchecked")
-	private <T extends RuleContext> T getInvokingRule(RuleContext ctx, Class<T> clz) {
-		RuleContext context = ctx;
-		while (!(clz.isInstance(context))) {
-			context = context.parent;
-			// throwing NPE here = root reached it should not happen
-		}
-		return (T) context;
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
 
 	}
 
 	@Override
-	public Object visitCreate_table_stmt(Create_table_stmtContext ctx) {
-		// TODO the source table data
-		String tableName = ctx.obj.getText();
-		TableDefinition def = new TableDefinition();
-		def.setSessionScoped(ctx.isvolatile);
-		if (Misc.isvolatile(tableName)) {
-			def.setSessionScoped(true);
-		}
-		if (ctx.def != null) {
-			List<String> colnames = (List<String>) ctx.def.accept(this);
-			for (String colname : colnames) {
-				def.addColumn(colname);
+	public ExprAnalyzeResult visitExpr2poi(Expr2poiContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
 
-			}
-			nameResolver.defineTable(tableName, def);
-		} else {
-			Object ss = ctx.st.accept(this);
-			if (ss instanceof String) {
-				TableDefinition sourceTableDef = nameResolver.searchTable((String) ss);
-				for (ColumnDefinition srcColDef : sourceTableDef.getColumns()) {
-
-					def.addColumn(srcColDef.getName());
-				}
-				nameResolver.defineTable(tableName, def);
-			} else {
-				SelectStmtData selectStmt = (SelectStmtData) ss;
-				for (ResultColumn rc : selectStmt.getColumns()) {
-					def.addColumn(rc.getName());
-				}
-				nameResolver.defineTable(tableName, def);
-
-			}
-		}
-		return null;
 	}
 
 	@Override
-	public String visitColumn_def(Column_defContext ctx) {
-		return ctx.cn.getText();
-	}
+	public ExprAnalyzeResult visitExprBetween(ExprBetweenContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
 
-	@Override
-	public List<String> visitColumn_defs(Column_defsContext ctx) {
-		List<String> colnames = new ArrayList<>();
-
-		for (Column_defContext cd : ctx.cd) {
-			colnames.add((String) cd.accept(this));
-		}
-
-		return colnames;
-	}
-
-	@Override
-	public Object visitCreate_source_table(Create_source_tableContext ctx) {
-		if (ctx.ss != null) {
-			return ctx.ss;
-		}
-
-		return ctx.obj.getText();
-	}
-
-	@Override
-	public Object visitCreate_view_stmt(Create_view_stmtContext ctx) {
-		// TODO the source table data
-		String tableName = ctx.obj.getText();
-		TableDefinition def = new TableDefinition();
-		if (ctx.cn.size() > 0) {
-			List<String> colnames = new ArrayList<>();
-			for (Column_nameContext colctx : ctx.cn) {
-				colnames.add(colctx.getText());
-			}
-			nameResolver.defineTable(tableName, def);
-		} else {
-
-			SelectStmtData selectStmt = (SelectStmtData) ctx.ss.accept(this);
-			for (ResultColumn rc : selectStmt.getColumns()) {
-				def.addColumn(rc.getName());
-			}
-			nameResolver.defineTable(tableName, def);
-
-		}
-		return null;
-	}
-
-	private void exitInsert_stmt(Insert_stmtContext ctx) {
-		InsertStmt stmt = new InsertStmt();
-		ctx.stmt = stmt;
-
-		stmt.dbobj = ctx.obj.objname;
-		// GlobalMeta.consumeTable(ctx.obj.objname);
-		SubQuery q = null;
-		if (ctx.ss != null) {
-			q = ctx.ss.q;
-		}
-
-		List<String> colnames = new ArrayList<>(ctx.cn.size());
-		for (int i = 0; i < ctx.cn.size(); ++i) {
-			if (GlobalSettings.isCaseSensitive()) {
-				colnames.add(ctx.cn.get(i).getText());
-			} else {
-				colnames.add(ctx.cn.get(i).getText().toUpperCase());
-			}
-		}
-
-		CreateTableStmt targetTable = null;
-		if (colnames.size() == 0) {
-			targetTable = provider.queryTable(stmt.dbobj);
-		}
-		List<Influences> exprs = new ArrayList<>(ctx.ex.size());
-		for (int i = 0; i < ctx.ex.size(); ++i) {
-			exprs.add(ctx.ex.get(i).inf);
-		}
-		stmt.fromSubQuery(colnames, targetTable, q, exprs, ctx.obj.objname);
-
-	}
-
-	private void exitUpdate_stmt(Update_stmtContext ctx) {
-		UpdateStmt q = new UpdateStmt();
-		ctx.q = q;
-		List<SubQuery> tables = new ArrayList<>();
-		SubQuery targetTable = new SubQuery();
-
-		// deal with "UPDATE A1 from REAL_TABLE_NAME a1,SOME_TABLE NAME a2,
-		// rewrite targettable.dbobj from A1 to REAL_TABLE_NAME
-		if (ctx.tobj.objname.ns.size() == 1 && ctx.f != null) {
-			String n = ctx.tobj.objname.ns.get(0);
-			for (SubQuery query : ctx.f.tables) {
-				if (n.equals(query.getAlias())) {
-					if (query.dbobj == null) {
-						throw new RuntimeException("update target is subquery " + n);
-					}
-					targetTable.dbobj = query.dbobj;
-
-				} else {
-					tables.add(query);
-				}
-			}
-		}
-
-		if (targetTable.dbobj == null) {
-			targetTable.dbobj = ctx.tobj.objname;
-		}
-		targetTable.copyRC(provider.queryTable(targetTable.dbobj));
-
-		if (ctx.ta != null) {
-			targetTable.setAlias(ctx.ta.getText());
-		}
-
-		if (ctx.wex != null) {
-			q.ci.addAllInClause(ctx.wex.inf);
-		}
-
-		q.columns = ctx.s.columns;
-		List<SubQuery> temp = new ArrayList<>();
-		temp.add(targetTable);
-		q.resolvenames(tables, new ArrayList<Integer>(), temp);
-		q.dbobj = targetTable.dbobj;
-	}
-
-	private void exitUpdate_stmt_from(Update_stmt_fromContext ctx) {
-		List<SubQuery> tables = new ArrayList<>();
-		ctx.tables = tables;
-		for (Table_or_subqueryContext table : ctx.ts) {
-			tables.add(table.q);
-		}
-	}
-
-	private void exitUpdate_stmt_set(Update_stmt_setContext ctx) {
-		// List<ResultColumn> columns = new ArrayList<>();
-		// ctx.columns = columns;
-		// for (int i = 0; i < ctx.cn.size(); ++i) {
-		// ResultColumn c = new ResultColumn();
-		// c.name = ctx.cn.get(i).getText();
-		// c.inf.addAll(ctx.ex.get(i).inf);
-		// columns.add(c);
-		// }
-	}
-
-	private void exitObject_name(Object_nameContext ctx) {
-		ObjectName name = new ObjectName();
-		for (Any_nameContext s : ctx.d) {
-			name.ns.add(s.getText());
-		}
-		ctx.objname = name;
-	}
-
-	@Override
-	public Object visitInsert_stmt(Insert_stmtContext ctx) {
-		String tableName = ctx.obj.getText();
-		TableDefinition def = nameResolver.searchTable(tableName);
-		List<ColumnDefinition> cdefs = new ArrayList<>();
-		SelectStmtData ss = null;
-		if (ctx.ss!=null)
-		{
-			ss = (SelectStmtData) ctx.ss.accept(this);
-		}
-		if (ctx.cn.size()>0)
-		{
-			
-			
-			for (Column_nameContext colnamectx:ctx.cn)
-			{
-				String colname = colnamectx.getText();
-				ColumnDefinition cdef = def.getColumnByName(colname);
-				Preconditions.checkState(cdef!=null,"Column to insert %s.%s not found",tableName,colname);
-				cdefs.add(cdef);
-			}
-		}
-//		else if (ss!=null)
-//		{
-//			for (ResultColumn rc:ss.getColumns())
-//			{
-//				String colname = rc.getName();
-//				ColumnDefinition cdef = def.getColumnByName(colname);
-//				Preconditions.checkState(cdef!=null,"Column to insert %s.%s not found",tableName,colname);
-//				cdefs.add(cdef);
-//			}			
-//		}
-		else
-		{
-			cdefs = def.getColumns();
-		}
-		
-		List<StateFunc> exprs = new ArrayList<>();
-		if (ss!=null)
-		{
-			ss.getColumns().forEach(rc->exprs.add(rc.getExpr()));
-		}
-		else
-		{
-			for (ExprContext exprctx:ctx.ex)
-			{
-				exprs.add(funcOfExpr(exprctx.accept(this)));
-			}
-		}
-		
-		Preconditions.checkState(cdefs.size()==exprs.size(),"Column size %d != expr size %d",cdefs.size(),exprs.size());
-		//TODO REMOVE SELF ASSIGN FROM LIST
-		
-		instbuffer.add(new Instruction<>( StateFunc.combineInsertOrUpdate(cdefs, exprs)));
-		return null;
-	}
-
-	@Override
-	public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
-		SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
-		instbuffer.add(new Instruction<>(ss));
-		return null;
-	}
-
-	@Override
-	public SelectStmtData visitSelect_stmt(Select_stmtContext ctx) {
-		LinkedList<String> ctes = new LinkedList<>();
-		for (Common_table_expressionContext ctectx : ctx.c) {
-			Tuple2<String, SelectStmtData> cte = (Tuple2<String, SelectStmtData>) ctectx.accept(this);
-			ctes.push(cte.getField0());
-			nameResolver.pushCte(cte.getField0(), cte.getField1());
-		}
-
-		List<SelectStmtData> svs = new ArrayList<>();
-
-		for (Select_or_valuesContext svctx : ctx.sv) {
-			SelectStmtData sv = (SelectStmtData) svctx.accept(this);
-			svs.add(sv);
-			Preconditions.checkState(svs.get(0).getColumns().size() == sv.getColumns().size(), "Union Column size mismatch");
-		}
-
-		while (!ctes.isEmpty()) {
-			nameResolver.popCte(ctes.pop());
-		}
-
-		SelectStmtData sv0 = svs.get(0);
-		if (svs.size() == 1) {
-			return sv0;
-		}
-
-		List<ResultColumn> columns = new ArrayList<>();
-		for (int i = 0; i < sv0.getColumns().size(); ++i) {
-
-			List<StateFunc> subs = new ArrayList<>();
-			for (SelectStmtData sv : svs) {
-				subs.add(sv.getColumnExprFunc(i));
-			}
-			columns.add(new ResultColumn(sv0.getColumns().get(i).getName(), i, StateFunc.combine(subs)));
-		}
-
-		return new SelectStmtData(columns);
-	}
-
-	@Override
-	public Object visitSelect_or_valuesSelectCore(Select_or_valuesSelectCoreContext ctx) {
-		return ctx.sc.accept(this);
-	}
-
-	@Override
-	public Object visitSelect_or_valuesSelectValue(Select_or_valuesSelectValueContext ctx) {
-		return ctx.ss.accept(this);
-	}
-
-	@Override
-	public Object visitUpdate_stmt(Update_stmtContext ctx) {
-		visitChildren(ctx);
-		exitUpdate_stmt(ctx);
-		return null;
-	}
-
-	@Override
-	public Object visitUpdate_stmt_from(Update_stmt_fromContext ctx) {
-		visitChildren(ctx);
-		exitUpdate_stmt_from(ctx);
-		return null;
-	}
-
-	@Override
-	public Object visitUpdate_stmt_set(Update_stmt_setContext ctx) {
-		visitChildren(ctx);
-		exitUpdate_stmt_set(ctx);
-		return null;
 	}
 
 	@Override
@@ -668,6 +421,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		}
 		return new ExprAnalyzeResult(
 				StateFunc.combine(e.stream().map(ExprAnalyzeResult::getTransformation).collect(Collectors.toList())));
+	}
+
+	@Override
+	public ExprAnalyzeResult visitExprExists(ExprExistsContext ctx) {
+		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
+		StateFunc fn = StateFunc.combineNoValue(ss.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()));
+		return new ExprAnalyzeResult(fn);
 	}
 
 	@Override
@@ -703,15 +463,14 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public ExprAnalyzeResult visitExprExists(ExprExistsContext ctx) {
-		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
-		StateFunc fn = StateFunc.combineNoValue(ss.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()));
-		return new ExprAnalyzeResult(fn);
-	}
+	public ExprAnalyzeResult visitExprLiteral(ExprLiteralContext ctx) {
+		String text = ctx.getText();
+		if (ctx.literal_value().STRING_LITERAL() != null) {
+			text = escape_sql_literal(text);
 
-	@Override
-	public ExprAnalyzeResult visitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
-		return (ExprAnalyzeResult) ctx.sp.accept(this);
+		}
+		return new ExprAnalyzeResult(StateFunc.of(), text);
+
 	}
 
 	@Override
@@ -722,7 +481,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			return new ExprAnalyzeResult(StateFunc.of());
 		}
 		Tuple2<ObjectDefinition, StateFunc> dd = nameResolver.searchByName(name);
-
+		if (dd == null) {
+			throw new IllegalStateException(String.format("Can't resolve symbol %s, pos %d %d", name, ctx.getStart().getLine(),
+					ctx.getStart().getCharPositionInLine()));
+		}
 		if (dd.getField0() != null) {
 			ObjectDefinition def = dd.getField0();
 			if (def instanceof ColumnDefinition) {
@@ -742,43 +504,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public ExprAnalyzeResult visitExpr2(Expr2Context ctx) {
-
-		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
-
-	}
-
-	@Override
-	public ExprAnalyzeResult visitExpr1(Expr1Context ctx) {
-		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
-	}
-
-	private static String compressQuotes(String paramString1, String paramString2) {
-		String str = paramString1;
-		for (int i = str.indexOf(paramString2); i != -1; i = str.indexOf(paramString2, i + 1))
-			str = str.substring(0, i + 1) + str.substring(i + 2);
-		return str;
-	}
-
-	private static String escape_sql_literal(String text) {
-		return compressQuotes(text.substring(1, text.length() - 1), "''");
-	}
-
-	@Override
-	public ExprAnalyzeResult visitExprLiteral(ExprLiteralContext ctx) {
-		String text = ctx.getText();
-		if (ctx.literal_value().STRING_LITERAL() != null) {
-			text = escape_sql_literal(text);
-
-		}
-		return new ExprAnalyzeResult(StateFunc.of(), text);
-
-	}
-
-	@Override
 	public ExprAnalyzeResult visitExprOR(ExprORContext ctx) {
 		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
 		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
@@ -791,39 +516,129 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public ExprAnalyzeResult visitExpr2poi(Expr2poiContext ctx) {
-		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
+	public ExprAnalyzeResult visitExprSpecialFunction(ExprSpecialFunctionContext ctx) {
+		return (ExprAnalyzeResult) ctx.sp.accept(this);
+	}
+
+	@Override
+	public Tuple2<List<StateFunc>, List<Integer>> visitGrouping_by_clause(Grouping_by_clauseContext ctx) {
+		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
+		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
+		return Tuple2.of(exprs, indexes);
+	}
+
+	@Override
+	public StateFunc visitHaving_clause(Having_clauseContext ctx) {
+		return funcOfExpr(ctx.ex.accept(this));
 
 	}
 
 	@Override
-	public ExprAnalyzeResult visitExprBetween(ExprBetweenContext ctx) {
-		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
+	public Object visitInsert_stmt(Insert_stmtContext ctx) {
+		String tableName = ctx.obj.getText();
+		TableDefinition def = nameResolver.searchTable(tableName);
+		if (def == null) {
+			if (metaGuessEnabled) {
+				def = new TableDefinition(tableName, false, true);
+				nameResolver.defineTable(tableName, def);
+			} else {
+				throw new IllegalStateException(String.format("Table %s not found", tableName));
+			}
 
+		}
+		List<ColumnDefinition> cdefs = new ArrayList<>();
+		SelectStmtData ss = null;
+		if (ctx.ss != null) {
+			ss = (SelectStmtData) ctx.ss.accept(this);
+		}
+		if (ctx.cn.size() > 0) {
+
+			for (Column_nameContext colnamectx : ctx.cn) {
+				String colname = colnamectx.getText();
+				ColumnDefinition cdef = def.getColumnByName(colname);
+				if (cdef == null) {
+					if (metaGuessEnabled) {
+						cdef = def.addColumn(colname, true);
+					} else {
+						throw new IllegalStateException(String.format("Column to insert %s.%s not found", tableName, colname));
+					}
+				}
+
+				cdefs.add(cdef);
+			}
+		}
+		// else if (ss!=null)
+		// {
+		// for (ResultColumn rc:ss.getColumns())
+		// {
+		// String colname = rc.getName();
+		// ColumnDefinition cdef = def.getColumnByName(colname);
+		// Preconditions.checkState(cdef!=null,"Column to insert %s.%s not
+		// found",tableName,colname);
+		// cdefs.add(cdef);
+		// }
+		// }
+		else {
+			cdefs = def.getColumns();
+		}
+
+		List<StateFunc> exprs = new ArrayList<>();
+		if (ss != null) {
+			ss.getColumns().forEach(rc -> exprs.add(rc.getExpr()));
+		} else {
+			for (ExprContext exprctx : ctx.ex) {
+				exprs.add(funcOfExpr(exprctx.accept(this)));
+			}
+		}
+
+		Preconditions.checkState(cdefs.size() == exprs.size(), "Column size %d != expr size %d", cdefs.size(), exprs.size());
+		// TODO REMOVE SELF ASSIGN FROM LIST
+
+		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		return null;
 	}
 
 	@Override
-	public ExprAnalyzeResult visitSpecial_function1(Special_function1Context ctx) {
-		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
+	public Object visitJoin_clause(Join_clauseContext ctx) {
+		// used directly by parent
+		return null;
 	}
 
 	@Override
-	public Object visitSpecial_functionSubString(Special_functionSubStringContext ctx) {
-		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
-		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
-		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
-		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
+	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
+		PatchList patchList = new PatchList();
+		patchList.setBreakList(new ArrayList<Instruction<State>>());
+		patchList.setContinueList(new ArrayList<Instruction<State>>());
+
+		PatchList prevpl = null;
+		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
+			PatchList currentpl = (PatchList) plsqlctx.accept(this);
+			patchList.getBreakList().addAll(currentpl.getBreakList());
+			patchList.getContinueList().addAll(currentpl.getContinueList());
+			if (prevpl != null) {
+				for (Instruction<State> ins : prevpl.getNextList()) {
+					ins.getNextPc().add(() -> currentpl.getStartInstruction());
+				}
+			} else {
+				patchList.setStartInstruction(currentpl.getStartInstruction());
+			}
+			prevpl = currentpl;
+		}
+		patchList.setNextList(prevpl.getNextList());
+		if (patchList.getBreakList().isEmpty()) {
+			patchList.setBreakList(Collections.EMPTY_LIST);
+		}
+		if (patchList.getContinueList().isEmpty()) {
+			patchList.setContinueList(Collections.EMPTY_LIST);
+		}
+		return patchList;
 	}
 
 	@Override
-	public Object visitSpecial_functionDateTime(Special_functionDateTimeContext ctx) {
-		return new ExprAnalyzeResult(StateFunc.of());
+	public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
+		SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
+		instbuffer.add(new Instruction<>(ss));
+		return null;
 	}
 
 	@Override
@@ -834,38 +649,76 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
+	public Tuple2<List<StateFunc>, List<Integer>> visitOrder_by_clause(Order_by_clauseContext ctx) {
+		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
+		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
+		return Tuple2.of(exprs, indexes);
+	}
+
+	@Override
 	public StateFunc visitOrdering_term_window(Ordering_term_windowContext ctx) {
 		return funcOfExpr(ctx.operand1.accept(this));
 	}
 
 	@Override
-	public Tuple2<String, SelectStmtData> visitCommon_table_expression(Common_table_expressionContext ctx) {
-		SelectStmtData data = (SelectStmtData) ctx.ss.accept(this);
-		if (ctx.cn.size() > 0) {
-			Preconditions.checkState(data.getColumns().size() == ctx.cn.size(), "CTE column size mismatch");
-			List<ResultColumn> results = new ArrayList<>();
-			for (int i = 0; i < ctx.cn.size(); ++i) {
-				results.add(new ResultColumn(ctx.cn.get(i).getText(), i, data.getColumnExprFunc(i)));
-			}
-			data = new SelectStmtData(results);
+	public VariableDefinition visitParameter_declaration(Parameter_declarationContext ctx) {
+		if (ctx.K_OUT() != null) {
+			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
 		}
+		VariableDefinition def = new VariableDefinition();
+		def.setName(ctx.any_name().getText());
+		ExprContext exprContext = ctx.expr();
+		if (exprContext != null) {
+			// TODO deal with expr
+		}
+		return def;
+	}
 
-		return Tuple2.of(ctx.tn.getText(), data);
+	@Override
+	public List<VariableDefinition> visitParameter_declarations(Parameter_declarationsContext ctx) {
+		List<VariableDefinition> defs = new ArrayList<VariableDefinition>();
+		for (Parameter_declarationContext vd : ctx.parameter_declaration()) {
+			defs.add((VariableDefinition) vd.accept(this));
+		}
+		return defs;
+	}
+
+	@Override
+	public PatchList visitPlsql_statement(Plsql_statementContext ctx) {
+		PatchList patchList = (PatchList) ctx.plsql_statement_nolabel().accept(this);
+		for (LabelContext labelctx : ctx.label()) {
+			String labelName = (String) labelctx.label_name().getText();
+			scopeStack.getLabels().put(labelName, patchList.getStartInstruction());
+		}
+		return patchList;
+	}
+
+	@Override
+	public PatchList visitPlsql_statement_nolabel(Plsql_statement_nolabelContext ctx) {
+		return (PatchList) visitChildren(ctx);
+	}
+
+	@Override
+	public Object visitProcedure_or_function_declaration(Procedure_or_function_declarationContext ctx) {
+		throw new UnsupportedOperationException("FORWARD DECLARATION NOT SUPPORTED");
+	}
+
+	@Override
+	public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public StateFunc visitQualify_clause(Qualify_clauseContext ctx) {
+		return funcOfExpr(ctx.ex.accept(this));
+
 	}
 
 	@Override
 	public List<Tuple2<String, StateFunc>> visitResult_columnAsterisk(Result_columnAsteriskContext ctx) {
 		List<Tuple2<String, StateFunc>> result = nameResolver.searchWildcardAll(current_file, ctx.getStart().getLine(),
 				ctx.getStart().getCharPositionInLine());
-		result.forEach(x -> nameResolver.enterResultColumn(null));
-		return result;
-	}
-
-	@Override
-	public List<Tuple2<String, StateFunc>> visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
-		String tableName = ctx.tn.getText();
-		List<Tuple2<String, StateFunc>> result = nameResolver.searchWildcardOneTable(tableName, current_file,
-				ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
 		result.forEach(x -> nameResolver.enterResultColumn(null));
 		return result;
 	}
@@ -895,32 +748,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public String visitTable_or_subqueryTable(Table_or_subqueryTableContext ctx) {
+	public List<Tuple2<String, StateFunc>> visitResult_columnTableAsterisk(Result_columnTableAsteriskContext ctx) {
 		String tableName = ctx.tn.getText();
-		if (ctx.dn != null) {
-			tableName = ctx.dn.getText() + tableName;
-		}
-		String alias = null;
-		if (ctx.ta != null) {
-			alias = ctx.ta.getText();
-		}
-
-		nameResolver.addFromTable(tableName, alias);
-		return tableName;
-	}
-
-	@Override
-	public String visitTable_or_subquerySubQuery(Table_or_subquerySubQueryContext ctx) {
-		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
-		String alias = ctx.ta.getText();
-		nameResolver.addFromSubQuery(alias, ss);
-		return alias;
-	}
-
-	@Override
-	public Object visitJoin_clause(Join_clauseContext ctx) {
-		// used directly by parent
-		return null;
+		List<Tuple2<String, StateFunc>> result = nameResolver.searchWildcardOneTable(tableName, current_file,
+				ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+		result.forEach(x -> nameResolver.enterResultColumn(null));
+		return result;
 	}
 
 	@Override
@@ -1016,33 +849,189 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public Tuple2<List<StateFunc>, List<Integer>> visitOrder_by_clause(Order_by_clauseContext ctx) {
-		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
-		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
-		return Tuple2.of(exprs, indexes);
+	public Object visitSelect_or_valuesSelectCore(Select_or_valuesSelectCoreContext ctx) {
+		return ctx.sc.accept(this);
+	}
+
+	@Override
+	public Object visitSelect_or_valuesSelectValue(Select_or_valuesSelectValueContext ctx) {
+		return ctx.ss.accept(this);
+	}
+
+	@Override
+	public SelectStmtData visitSelect_stmt(Select_stmtContext ctx) {
+		LinkedList<String> ctes = new LinkedList<>();
+		for (Common_table_expressionContext ctectx : ctx.c) {
+			Tuple2<String, SelectStmtData> cte = (Tuple2<String, SelectStmtData>) ctectx.accept(this);
+			ctes.push(cte.getField0());
+			nameResolver.pushCte(cte.getField0(), cte.getField1());
+		}
+
+		List<SelectStmtData> svs = new ArrayList<>();
+
+		for (Select_or_valuesContext svctx : ctx.sv) {
+			SelectStmtData sv = (SelectStmtData) svctx.accept(this);
+			svs.add(sv);
+			Preconditions.checkState(svs.get(0).getColumns().size() == sv.getColumns().size(), "Union Column size mismatch");
+		}
+
+		while (!ctes.isEmpty()) {
+			nameResolver.popCte(ctes.pop());
+		}
+
+		SelectStmtData sv0 = svs.get(0);
+		if (svs.size() == 1) {
+			return sv0;
+		}
+
+		List<ResultColumn> columns = new ArrayList<>();
+		for (int i = 0; i < sv0.getColumns().size(); ++i) {
+
+			List<StateFunc> subs = new ArrayList<>();
+			for (SelectStmtData sv : svs) {
+				subs.add(sv.getColumnExprFunc(i));
+			}
+			columns.add(new ResultColumn(sv0.getColumns().get(i).getName(), i, StateFunc.combine(subs)));
+		}
+
+		return new SelectStmtData(columns);
+	}
+
+	@Override
+	public ExprAnalyzeResult visitSpecial_function1(Special_function1Context ctx) {
+		ExprAnalyzeResult e = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e.getTransformation()));
+	}
+
+	@Override
+	public Object visitSpecial_functionDateTime(Special_functionDateTimeContext ctx) {
+		return new ExprAnalyzeResult(StateFunc.of());
+	}
+
+	@Override
+	public Object visitSpecial_functionSubString(Special_functionSubStringContext ctx) {
+		ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
+		ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
+		ExprAnalyzeResult e3 = (ExprAnalyzeResult) ctx.operand3.accept(this);
+		return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation(), e3.getTransformation()));
+	}
+
+	@Override
+	public Object visitSql_stmt(Sql_stmtContext ctx) {
+		current_sql = stream.getText(ctx.getSourceInterval());
+		visitChildren(ctx);
+		return null;
+	}
+
+	@Override
+	public String visitTable_or_subquerySubQuery(Table_or_subquerySubQueryContext ctx) {
+		SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
+		String alias = ctx.ta.getText();
+		nameResolver.addFromSubQuery(alias, ss);
+		return alias;
+	}
+
+	@Override
+	public String visitTable_or_subqueryTable(Table_or_subqueryTableContext ctx) {
+		String tableName = ctx.tn.getText();
+		if (ctx.dn != null) {
+			tableName = ctx.dn.getText() + "." + tableName;
+		}
+		String alias = null;
+		if (ctx.ta != null) {
+			alias = ctx.ta.getText();
+		}
+
+		nameResolver.addFromTable(tableName, alias);
+		return tableName;
+	}
+
+	@Override
+	public Object visitUpdate_stmt(Update_stmtContext ctx) {
+		nameResolver.enterSelectStmt(ctx);
+
+		String tableName = ctx.tobj.getText();
+		TableDefinition targetTableDef;
+		if (ctx.ta != null) {
+			String alias = ctx.ta.getText();
+			nameResolver.addFromTable(tableName, alias);
+		}
+
+		if (ctx.f != null) {
+			ctx.f.accept(this);
+		}
+
+		targetTableDef = nameResolver.searchTable(tableName);
+		if (targetTableDef == null) {
+			targetTableDef = nameResolver.getAliasTableDefinition(tableName);
+			// if (targetTableDef == null)
+			// {
+			// if (metaGuessEnabled)
+			// {
+			//
+			// }
+			// else
+			// {
+			// throw new IllegalStateException("");
+			// }
+			// }
+			tableName = targetTableDef.getName();
+		}
+
+		StateFunc whereclause = StateFunc.of();
+		if (ctx.wex != null) {
+			whereclause = funcOfExpr(ctx.wex.accept(this));
+		}
+		List<ColumnDefinition> cdefs = new ArrayList<>();
+		List<StateFunc> exprs = new ArrayList<>();
+		for (int i = 0; i < ctx.s.cn.size(); ++i) {
+			String columnName = ctx.s.cn.get(i).getText();
+			ColumnDefinition cdef = targetTableDef.getColumnByName(columnName);
+			if (cdef == null) {
+				if (metaGuessEnabled) {
+					cdef = targetTableDef.addColumn(columnName, true);
+				} else {
+					throw new IllegalStateException(String.format("Column to insert %s.%s not found", tableName, columnName));
+				}
+			}
+			cdefs.add(cdef);
+			exprs.add(StateFunc.combine(funcOfExpr(ctx.s.ex.get(i).accept(this)), whereclause));
+		}
+
+		nameResolver.exitSelectStmt(ctx);
+
+		instbuffer.add(new Instruction<>(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		return null;
+	}
+
+	@Override
+	public Object visitUpdate_stmt_from(Update_stmt_fromContext ctx) {
+		visitChildren(ctx);
+		return null;
+	}
+
+	@Override
+	public PatchList visitWhile_loop_statement(While_loop_statementContext ctx) {
+		StateFunc exprf = funcOfExpr(ctx.expr().accept(this));
+		return null;
+	}
+	@Override
+	public VariableDefinition visitVariable_declaration(Variable_declarationContext ctx) {
+		// COPY FROM visitParameter_declaration
+
+		VariableDefinition def = new VariableDefinition();
+		def.setName(ctx.any_name().getText());
+		// def.setConst(ctx.K_CONSTANT() != null);
+		ExprContext exprContext = ctx.expr();
+		if (exprContext != null) {
+			// TODO deal with expr
+		}
+
+		return def;
 	}
 
 	@Override
 	public StateFunc visitWhere_clause(Where_clauseContext ctx) {
-		return funcOfExpr(ctx.ex.accept(this));
-
-	}
-
-	@Override
-	public Tuple2<List<StateFunc>, List<Integer>> visitGrouping_by_clause(Grouping_by_clauseContext ctx) {
-		List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
-		List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
-		return Tuple2.of(exprs, indexes);
-	}
-
-	@Override
-	public StateFunc visitHaving_clause(Having_clauseContext ctx) {
-		return funcOfExpr(ctx.ex.accept(this));
-
-	}
-
-	@Override
-	public StateFunc visitQualify_clause(Qualify_clauseContext ctx) {
 		return funcOfExpr(ctx.ex.accept(this));
 
 	}

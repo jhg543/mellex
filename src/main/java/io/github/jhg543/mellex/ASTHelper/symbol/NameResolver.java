@@ -1,6 +1,7 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 
@@ -20,23 +21,23 @@ public class NameResolver {
 	private PseudoColumnResolver pse;
 	private DatabaseVendor vendor;
 	private TableStorage tableStorage;
+	private boolean guessEnabled;
 
-	
-	
-	public NameResolver(DatabaseVendor vendor, TableStorage tableStorage) {
+	public NameResolver(DatabaseVendor vendor, TableStorage tableStorage, boolean guessEnabled) {
 		super();
 		this.vendor = vendor;
 		this.tableStorage = tableStorage;
-		this.alias = new AliasColumnResolver(vendor.equals(DatabaseVendor.ORACLE), tableStorage::getTable);
+		this.guessEnabled = guessEnabled;
+		this.alias = new AliasColumnResolver(vendor.equals(DatabaseVendor.ORACLE), tableStorage,guessEnabled);
 		this.local = new LocalObjectResolver();
-		this.global = new GlobalObjectResolver(true,  tableStorage::getTable);
+		this.global = new GlobalObjectResolver(true, tableStorage::getTable);
 		this.pse = new PseudoColumnResolver(vendor);
-		if (vendor.equals(DatabaseVendor.TERADATA))
-		{
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			this.ors = new OtherResultColumnResolver();
 		}
 
 	}
+
 	/**
 	 * 
 	 * @param name
@@ -53,14 +54,15 @@ public class NameResolver {
 			return (FunctionDefinition) result;
 		}
 		return null;
-		
+
 	}
+
 	/**
 	 * 
 	 * @param name
 	 * @return not found = throw exception
 	 */
-	public Tuple2<ObjectDefinition,StateFunc> searchByName(String name) {
+	public Tuple2<ObjectDefinition, StateFunc> searchByName(String name) {
 		Object result;
 
 		result = pse.searchByName(name);
@@ -75,12 +77,12 @@ public class NameResolver {
 
 		result = local.searchByName(name);
 		if (result != null) {
-			return Tuple2.of((ObjectDefinition)result, null);
+			return Tuple2.of((ObjectDefinition) result, null);
 		}
 
 		result = global.searchByName(name);
 		if (result != null) {
-			return Tuple2.of((ObjectDefinition)result, null);
+			return Tuple2.of((ObjectDefinition) result, null);
 		}
 
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
@@ -90,12 +92,25 @@ public class NameResolver {
 			}
 		}
 
-		result = alias.guessColumn(name);
-		if (result != null) {
-			return Tuple2.of((ObjectDefinition)result, null);
+		if (isGuessEnabled()) {
+			result = alias.guessColumn(name);
+			if (result != null) {
+				return Tuple2.of((ObjectDefinition) result, null);
+			}
 		}
 
-		throw new RuntimeException("Can't resolve name " + name);
+		return null;
+	}
+
+	/**
+	 * this is used in ”update a1 from sometable a1"
+	 * 
+	 * @param alias
+	 * @return null if not found
+	 */
+	public TableDefinition getAliasTableDefinition(String alias) {
+		return (TableDefinition) this.alias.searchSubqueryOrCteOrLiveTable(alias);
+		
 	}
 
 	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {
@@ -133,7 +148,7 @@ public class NameResolver {
 
 	public void enterSelectStmt(Object scopeId) {
 		alias.pushScope(scopeId);
-		local.pushScope(scopeId,true);
+		local.pushScope(scopeId, true);
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.enterSelectStmt();
 		}
@@ -153,11 +168,12 @@ public class NameResolver {
 		}
 	}
 
-	public void collectResultColumnAlias(List<String> aliasList){
+	public void collectResultColumnAlias(List<String> aliasList) {
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.collectResultColumnAlias(aliasList);
 		}
 	}
+
 	public SelectStmtData rewriteAfterResultColumns(SelectStmtData tempResult) {
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			return ors.rewriteStateFunc(tempResult);
@@ -165,21 +181,33 @@ public class NameResolver {
 		return tempResult;
 	}
 
-	public void defineTable(String name, TableDefinition def)
-	{
+	public void defineTable(String name, TableDefinition def) {
 		tableStorage.putTable(name, def);
 	}
-	
-	public TableDefinition searchTable(String name)
-	{
+
+	/**
+	 * null if not found
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public TableDefinition searchTable(String name) {
 		return tableStorage.getTable(name);
 	}
-	
+
 	public void addFromTable(String tableName, String alias) {
 		this.alias.addFromTable(tableName, alias);
 	}
 
 	public void addFromSubQuery(String alias, SelectStmtData subquery) {
 		this.alias.addFromSubQuery(alias, subquery);
+	}
+
+	public boolean isGuessEnabled() {
+		return guessEnabled;
+	}
+
+	public void setGuessEnabled(boolean guessEnabled) {
+		this.guessEnabled = guessEnabled;
 	}
 }

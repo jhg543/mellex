@@ -13,7 +13,7 @@ public class ResultColumn extends ColumnDefinition {
 		this.expr = expr;
 	}
 	public ResultColumn(String name, int position, StateFunc expr) {
-		super(name,position);
+		super(name,position,null);
 		this.expr = expr;
 	}
 	

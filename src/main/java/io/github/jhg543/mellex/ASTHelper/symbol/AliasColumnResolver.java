@@ -39,15 +39,17 @@ public class AliasColumnResolver {
 	 * for Oracle it's true, for other DB it's false
 	 */
 	private boolean parentScopeVisible;
+	private boolean guessEnabled;
 
-	private Function<String, TableDefinition> tableResolver;
+	private TableStorage tableResolver;
 
 	private static Splitter dotsplitter = Splitter.on('.');
 
-	public AliasColumnResolver(boolean parentScopeVisible, Function<String, TableDefinition> tableResolver) {
+	public AliasColumnResolver(boolean parentScopeVisible, TableStorage tableResolver, boolean guessEnabled) {
 		super();
 		this.parentScopeVisible = parentScopeVisible;
 		this.tableResolver = tableResolver;
+		this.guessEnabled = guessEnabled;
 	}
 
 	public void popCte(String alias) {
@@ -77,11 +79,16 @@ public class AliasColumnResolver {
 			return;
 		}
 
-		TableDefinition td = tableResolver.apply(tableName);
+		TableDefinition td = tableResolver.getTable(tableName);
 		if (td == null) {
-			throw new RuntimeException("Table not found: " + tableName);
+			if (guessEnabled) {
+				td = new TableDefinition(tableName, false, true);
+				tableResolver.putTable(tableName, td);
+			} else {
+				throw new RuntimeException("Table not found: " + tableName);
+			}
 		}
-		scopes.peek().getLiveTables().put(alias == null ? tableName : alias, tableResolver.apply(tableName));
+		scopes.peek().getLiveTables().put(alias == null ? tableName : alias, td);
 		// select * from sometable
 
 	}
@@ -96,8 +103,8 @@ public class AliasColumnResolver {
 				.flatMap(es -> es.getValue().getColumns().stream().map(rc -> Tuple2.of(rc.getName(), rc.getExpr())));
 
 		Stream<Tuple2<String, StateFunc>> b = s.getLiveTables().entrySet().stream()
-				.flatMap(es -> es.getValue().getColumns().stream().map(e -> Tuple2.of(e.getName(), StateFunc
-						.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition))))));
+				.flatMap(es -> es.getValue().getColumns().stream().map(e -> Tuple2.of(e.getName(),
+						StateFunc.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition))))));
 		return Stream.concat(a, b).collect(Collectors.toList());
 	}
 
@@ -113,24 +120,28 @@ public class AliasColumnResolver {
 		TableDefinition td = s.liveTables.get(tableName);
 
 		// TODO if td def not exist?
-		
+
 		if (td != null) {
 			return td.getColumns().stream()
 					.map(e -> Tuple2.of(e.getName(),
-							StateFunc.ofValue(
-									ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition)))))
+							StateFunc.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition)))))
 					.collect(Collectors.toList());
 		}
 
 		throw new RuntimeException("Table " + tableName + " not found");
 	}
 
-	private SelectStmtData searchSubqueryOrCte(String alias) {
+	public Object searchSubqueryOrCteOrLiveTable(String alias) {
 
 		for (Scope s : scopes) {
 			SelectStmtData data = s.getSubqueries().get(alias);
 			if (data != null) {
 				return data;
+			}
+
+			TableDefinition def = s.getLiveTables().get(alias);
+			if (def != null) {
+				return def;
 			}
 
 			if (!parentScopeVisible) {
@@ -183,12 +194,28 @@ public class AliasColumnResolver {
 		List<String> namedotsplit = dotsplitter.splitToList(name);
 		if (namedotsplit.size() == 2) {
 			String tableName = namedotsplit.get(0);
-			SelectStmtData ss = searchSubqueryOrCte(tableName);
-			if (ss != null) {
+			Object dd = searchSubqueryOrCteOrLiveTable(tableName);
+			if (dd != null) {
 				String columnName = namedotsplit.get(1);
-				StateFunc inf = ss.getColumnExprFunc(columnName);
-				Preconditions.checkState(inf != null, "No column %s found in Subquery %s", columnName, tableName);
-				return Tuple2.of(null, inf);
+				if (dd instanceof SelectStmtData) {
+					SelectStmtData ss = (SelectStmtData) dd;
+					StateFunc inf = ss.getColumnExprFunc(columnName);
+					Preconditions.checkState(inf != null, "No column %s found in Subquery %s", columnName, tableName);
+					return Tuple2.of(null, inf);
+				} else {
+					TableDefinition tdef = (TableDefinition) dd;
+					ColumnDefinition cdef = tdef.getColumnByName(columnName);
+					if (cdef == null) {
+						if (guessEnabled) {
+							cdef = tdef.addColumn(columnName);
+						} else {
+							throw new IllegalStateException(
+									String.format("No column %s found in Table %s", columnName, tableName));
+						}
+					}
+
+					return Tuple2.of(cdef, null);
+				}
 			} else {
 				// if it's a table, leave it to globalObjectResolver
 				// TODO it will pass even if not in the "from" list
@@ -219,9 +246,7 @@ public class AliasColumnResolver {
 		Scope s = scopes.peek();
 		if (s.getSubqueries().size() == 0 && s.getLiveTables().size() == 1) {
 			Entry<String, TableDefinition> e = s.getLiveTables().entrySet().iterator().next();
-			ColumnDefinition cd = new ColumnDefinition("[Guess]" + e.getKey() + "." + name,-1);
-			cd.setInfered(true);
-			// e.getValue().getColumns().put(name, cd);
+			ColumnDefinition cd = e.getValue().addColumn(name, true);
 			return cd;
 		} else {
 			return null;

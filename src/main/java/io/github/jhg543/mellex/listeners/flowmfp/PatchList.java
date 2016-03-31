@@ -3,32 +3,32 @@ package io.github.jhg543.mellex.listeners.flowmfp;
 import java.util.Collection;
 
 public class PatchList {
-	private Instruction<VariableUsageState> startInstruction;
-	private Collection<Instruction<VariableUsageState>> breakList;
-	private Collection<Instruction<VariableUsageState>> ContinueList;
-	private Collection<Instruction<VariableUsageState>> nextList;
-	public Collection<Instruction<VariableUsageState>> getBreakList() {
+	private Instruction<State> startInstruction;
+	private Collection<Instruction<State>> breakList;
+	private Collection<Instruction<State>> ContinueList;
+	private Collection<Instruction<State>> nextList;
+	public Collection<Instruction<State>> getBreakList() {
 		return breakList;
 	}
-	public void setBreakList(Collection<Instruction<VariableUsageState>> breakList) {
+	public void setBreakList(Collection<Instruction<State>> breakList) {
 		this.breakList = breakList;
 	}
-	public Collection<Instruction<VariableUsageState>> getContinueList() {
+	public Collection<Instruction<State>> getContinueList() {
 		return ContinueList;
 	}
-	public void setContinueList(Collection<Instruction<VariableUsageState>> continueList) {
+	public void setContinueList(Collection<Instruction<State>> continueList) {
 		ContinueList = continueList;
 	}
-	public Collection<Instruction<VariableUsageState>> getNextList() {
+	public Collection<Instruction<State>> getNextList() {
 		return nextList;
 	}
-	public void setNextList(Collection<Instruction<VariableUsageState>> nextList) {
+	public void setNextList(Collection<Instruction<State>> nextList) {
 		this.nextList = nextList;
 	}
-	public Instruction<VariableUsageState> getStartInstruction() {
+	public Instruction<State> getStartInstruction() {
 		return startInstruction;
 	}
-	public void setStartInstruction(Instruction<VariableUsageState> startInstruction) {
+	public void setStartInstruction(Instruction<State> startInstruction) {
 		this.startInstruction = startInstruction;
 	}
 	

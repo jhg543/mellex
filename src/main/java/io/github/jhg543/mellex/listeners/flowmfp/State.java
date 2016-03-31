@@ -6,7 +6,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import java.util.HashMap;
 import java.util.Set;
 
-public class VariableUsageState {
+public class State {
 	// as branchCondUsage 
 	private HashMap<VariableDefinition, Set<InfSource>> variableUsage;
 	private HashMap<String, Set<InfSource>> globalObjectUsage;
@@ -49,7 +49,7 @@ public class VariableUsageState {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		VariableUsageState other = (VariableUsageState) obj;
+		State other = (State) obj;
 		if (branchCondUsage == null) {
 			if (other.branchCondUsage != null)
 				return false;
@@ -69,9 +69,9 @@ public class VariableUsageState {
 	}
 	
 	
-	public VariableUsageState shallowCopy()
+	public State shallowCopy()
 	{
-		VariableUsageState s = new VariableUsageState();
+		State s = new State();
 		s.branchCondUsage = this.branchCondUsage;
 		s.globalObjectUsage = this.globalObjectUsage;
 		s.variableUsage = this.variableUsage;

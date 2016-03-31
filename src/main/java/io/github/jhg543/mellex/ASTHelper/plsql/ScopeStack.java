@@ -1,7 +1,7 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
 import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
-import io.github.jhg543.mellex.listeners.flowmfp.VariableUsageState;
+import io.github.jhg543.mellex.listeners.flowmfp.State;
 
 import java.util.Deque;
 import java.util.HashMap;
@@ -20,7 +20,7 @@ public class ScopeStack {
 
 	private Map<String, ObjectDefinition> cache;
 
-	private Map<String, Instruction<VariableUsageState>> labels;
+	private Map<String, Instruction<State>> labels;
 	
 	private Deque<ControlBlock> blocks;
 
@@ -30,7 +30,7 @@ public class ScopeStack {
 		blocks = new LinkedList<ControlBlock>();
 		stack = new LinkedList<ControlBlock>();
 		cache = new HashMap<String, ObjectDefinition>();
-		labels = new HashMap<String, Instruction<VariableUsageState>>();
+		labels = new HashMap<String, Instruction<State>>();
 		blocks.push(ROOT);
 	}
 
@@ -106,7 +106,7 @@ public class ScopeStack {
 		return null;
 	}
 
-	public Map<String, Instruction<VariableUsageState>> getLabels() {
+	public Map<String, Instruction<State>> getLabels() {
 		return labels;
 	}
 	

@@ -15,15 +15,19 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser;
 import io.github.jhg543.mellex.listeners.PLSQLDataFlowVisitor;
 import io.github.jhg543.mellex.listeners.flowmfp.InstBuffer;
 import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
-import io.github.jhg543.mellex.listeners.flowmfp.VariableUsageState;
+import io.github.jhg543.mellex.listeners.flowmfp.State;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.Misc;
 
 public class DebugMain {
 
-	private String GetSql(String inputfile) {
+	private DatabaseVendor vendor;
+	private boolean guessEnabled;
+	private String sql;
+
+	public static String GetSql(String inputfile) {
 		try {
-			Path f = (new File(this.getClass().getClassLoader().getResource("test/z01/sql/" + inputfile).toURI())).toPath();
+			Path f = (new File(DebugMain.class.getClassLoader().getResource("test/z01/sql/" + inputfile).toURI())).toPath();
 			return Misc.trimPerlScript(f).toUpperCase();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -41,30 +45,37 @@ public class DebugMain {
 		DefaultSQLPParser parser = new DefaultSQLPParser(tokens);
 		ParseTree tree = null;
 		tree = parser.parse();
-		PLSQLDataFlowVisitor visitor = new PLSQLDataFlowVisitor(tokens, buffer, DatabaseVendor.TERADATA);
+		PLSQLDataFlowVisitor visitor = new PLSQLDataFlowVisitor(tokens, buffer, vendor, guessEnabled);
 		visitor.visit(tree);
 
 		return buffer;
 	}
 
 	private void printInstBuffer(InstBuffer buffer) {
-		for (Instruction<VariableUsageState> inst : buffer.getInstbuffer()) {
+		for (Instruction<State> inst : buffer.getInstbuffer()) {
 			Object obj = inst.getDebugInfo();
 			System.out.println(obj.toString());
-//			if (obj instanceof SelectStmtData) {
-//				SelectStmtData ss = (SelectStmtData) obj;
-//				System.out.println(ss.toString());
-//			}
+			// if (obj instanceof SelectStmtData) {
+			// SelectStmtData ss = (SelectStmtData) obj;
+			// System.out.println(ss.toString());
+			// }
 		}
 	}
 
-	
-	public void debug() {
-		printInstBuffer(generateInst(GetSql("s011.sql")));
+	public DebugMain(DatabaseVendor vendor, boolean guessEnabled, String sql) {
+		super();
+		this.vendor = vendor;
+		this.guessEnabled = guessEnabled;
+		this.sql = sql;
 	}
-	
+
+	public void run() {
+		printInstBuffer(generateInst(sql));
+	}
+
 	public static void main(String[] args) throws Exception {
-		DebugMain d= new DebugMain();
-		d.debug();
+
+		DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("s001.sql"));
+		d.run();
 	}
 }

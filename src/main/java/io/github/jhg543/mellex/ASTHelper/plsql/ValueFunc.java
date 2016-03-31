@@ -67,7 +67,7 @@ public class ValueFunc {
 
 	@Override
 	public String toString() {
-		return "VF [" + (objects.isEmpty() ? "" : ("obj=" + objects))
+		return "V [" + (objects.isEmpty() ? "" : ("obj=" + objects))
 				+ (parameters.isEmpty() ? "" : (" param=" + parameters)) + "]";
 	}
 

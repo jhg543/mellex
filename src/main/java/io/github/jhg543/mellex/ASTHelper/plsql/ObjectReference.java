@@ -78,7 +78,7 @@ public class ObjectReference {
 
 	@Override
 	public String toString() {
-		return "Ref [def=" + objectDefinition + ", pos=" + lineNumber + "," + charPosition + ", f=" + fileName + "]";
+		return "["+ objectDefinition + ", " + lineNumber + "," + charPosition + "," + fileName + "]";
 	}
 
 	public ObjectReference(ObjectDefinition objectDefinition, String fileName, int lineNumber, int charPosition) {
