@@ -3,6 +3,7 @@ package io.github.jhg543.mellex.ASTHelper.plsql;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
@@ -96,6 +97,26 @@ public class ValueFunc {
 		}
 	}
 
+	public static ValueFunc combine(List<ValueFunc> subs) {
+		ValueFunc.Builder builder = new ValueFunc.Builder();
+		for (ValueFunc fn : subs) {
+			builder.add(fn);
+		}
+
+		return builder.Build();
+	}
+	
+	public ValueFunc add(ValueFunc... others)
+	{
+		ValueFunc.Builder builder = new ValueFunc.Builder();
+		builder.add(this);
+		for (ValueFunc fn : others) {
+			builder.add(fn);
+		}
+		return builder.Build();
+	}
+
+	
 	@Override
 	public String toString() {
 		return "V [" + (objects.isEmpty() ? "" : ("obj=" + objects)) + (parameters.isEmpty() ? "" : (" param=" + parameters))

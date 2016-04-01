@@ -14,6 +14,7 @@ import org.junit.Test;
 import com.google.common.collect.ImmutableMap;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.FilteredValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
@@ -49,6 +50,13 @@ public class StateTransformTest {
 		Assert.assertEquals(v1.getParameters(), v2.getParameters());
 	}
 
+	private void checkEqual(FilteredValueFunc v1, FilteredValueFunc v2) {
+
+		checkEqual(v1.getFilter(), v2.getFilter());
+		checkEqual(v1.getValue(), v2.getValue());
+	}
+
+	
 	private void checkEqual(StateFunc s1, StateFunc s2) {
 		checkEqual(s1.getValue(), s2.getValue());
 		checkEqual(s1.getBranchCond(), s2.getBranchCond());
@@ -63,7 +71,7 @@ public class StateTransformTest {
 			this.value = value;
 		}
 
-		public void setUpdates(Map<ObjectDefinition, ValueFunc> updates) {
+		public void setUpdates(Map<ObjectDefinition, FilteredValueFunc> updates) {
 			this.updates = updates;
 		}
 
@@ -103,21 +111,28 @@ public class StateTransformTest {
 
 	@Test
 	public void combineUpdate() {
-		Map<ObjectDefinition, ValueFunc> u1 = ImmutableMap.of(c[0], ValueFunc.of(v[5]), c[1], ValueFunc.of(v[4]));
-		Map<ObjectDefinition, ValueFunc> u2 = ImmutableMap.of(c[0], ValueFunc.of(v[5], v[4]), c[2], ValueFunc.of(r[1]));
-		Map<ObjectDefinition, ValueFunc> u3 = ImmutableMap.of(c[0], ValueFunc.of(r[0]), c[1], ValueFunc.of(v[0]));
-		StateFunc s1 = StateFunc.ofUpdate(u1);
+		ValueFunc vr0 = ValueFunc.of(r[0]);
+
+		Map<ObjectDefinition, FilteredValueFunc> u1 = ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(v[5]),vr0), c[1], new FilteredValueFunc(ValueFunc.of(v[4]),vr0));
+		Map<ObjectDefinition, FilteredValueFunc> u2 = ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(v[5], v[4]),vr0), c[2], new FilteredValueFunc(ValueFunc.of(r[1]),vr0));
+		Map<ObjectDefinition, FilteredValueFunc> u3 = ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(r[0]),vr0), c[1], new FilteredValueFunc(ValueFunc.of(v[0]),vr0));
+	
+			StateFunc s1 = StateFunc.ofUpdate(u1);
 		StateFunc s2 = StateFunc.ofUpdate(u2);
 		StateFunc s3 = StateFunc.ofUpdate(u3);
 
-		StateFunc s4 = StateFunc.ofAssign(u1);
-		StateFunc s5 = StateFunc.ofAssign(u2);
-		StateFunc s6 = StateFunc.ofAssign(u3);
+		Map<ObjectDefinition, ValueFunc> a1 = ImmutableMap.of(c[0], ValueFunc.of(v[5]), c[1], ValueFunc.of(v[4]));
+		Map<ObjectDefinition, ValueFunc> a2 = ImmutableMap.of(c[0], ValueFunc.of(v[5], v[4]), c[2], ValueFunc.of(r[1]));
+		Map<ObjectDefinition, ValueFunc> a3 = ImmutableMap.of(c[0], ValueFunc.of(r[0]), c[1], ValueFunc.of(v[0]));
+
+		StateFunc s4 = StateFunc.ofAssign(a1);
+		StateFunc s5 = StateFunc.ofAssign(a2);
+		StateFunc s6 = StateFunc.ofAssign(a3);
 
 		StateFunc answer = StateFunc.combine(s1, s2, s3, s4, s5, s6);
 		MutableSD expectedResult = MutableSD.create();
-		expectedResult.setUpdates(ImmutableMap.of(c[0], ValueFunc.of(Arrays.asList(v[5], v[4]), Arrays.asList(r[0])), c[1],
-				ValueFunc.of(v[4], v[0]), c[2], ValueFunc.of(r[1])));
+		expectedResult.setUpdates(ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(Arrays.asList(v[5], v[4]), Arrays.asList(r[0])),vr0), c[1],
+				new FilteredValueFunc(ValueFunc.of(v[4], v[0]),vr0), c[2], new FilteredValueFunc(ValueFunc.of(r[1]),vr0)));
 		expectedResult.setAssigns(ImmutableMap.of(c[0], ValueFunc.of(Arrays.asList(v[5], v[4]), Arrays.asList(r[0])), c[1],
 				ValueFunc.of(v[4], v[0]), c[2], ValueFunc.of(r[1])));
 		checkEqual(expectedResult, answer);
@@ -127,6 +142,7 @@ public class StateTransformTest {
 	public void functionCall() {
 		// f(p0,p1,p2) { while (p2+col[2]) col[0] =p0 + p1 ; col[1] = r[1] ; p0
 		// = p1 + p2; return p1+p2; }
+		ValueFunc vr0 = ValueFunc.of(r[0]);
 		FunctionDefinition fndef = new FunctionDefinition();
 		List<VariableDefinition> params = new ArrayList<VariableDefinition>();
 		IntStream.range(0, 3).forEach(i -> {
@@ -137,7 +153,7 @@ public class StateTransformTest {
 		VariableDefinition[] p = params.toArray(new VariableDefinition[0]);
 
 		Map<ObjectDefinition, ValueFunc> as = ImmutableMap.of(p[1], ValueFunc.of(p[0], p[2]));
-		Map<ObjectDefinition, ValueFunc> us = ImmutableMap.of(c[0], ValueFunc.of(p[0], p[1]), c[1], ValueFunc.of(r[1]));
+		Map<ObjectDefinition, FilteredValueFunc> us = ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(p[0], p[1]),vr0), c[1], new FilteredValueFunc(ValueFunc.of(r[1]),vr0));
 		ValueFunc v1 = ValueFunc.of(p[1], p[2]);
 		ValueFunc b1 = ValueFunc.of(Arrays.asList(p[2]), Arrays.asList(r[2]));
 		StateFunc fn = StateFunc.combine(StateFunc.ofValue(v1), StateFunc.ofAssign(as), StateFunc.ofUpdate(us),
@@ -153,7 +169,7 @@ public class StateTransformTest {
 		MutableSD expectedResult = MutableSD.create();
 		expectedResult.setValue(ValueFunc.of(v[2], v[3], v[4], v[5]));
 		expectedResult.setAddedBranchConds(ValueFunc.of(Arrays.asList(v[3], v[4], v[5]), Arrays.asList(r[2])));
-		expectedResult.setUpdates(ImmutableMap.of(c[0], ValueFunc.of(v[0], v[1], v[2]), c[1], ValueFunc.of(r[1])));
+		expectedResult.setUpdates(ImmutableMap.of(c[0], new FilteredValueFunc(ValueFunc.of(v[0], v[1], v[2]),vr0), c[1], new FilteredValueFunc(ValueFunc.of(r[1]),vr0)));
 		expectedResult.setAssigns(ImmutableMap.of(v[2], ValueFunc.of(v[0], v[3], v[4], v[5], v[1])));
 
 		checkEqual(expectedResult, answer);

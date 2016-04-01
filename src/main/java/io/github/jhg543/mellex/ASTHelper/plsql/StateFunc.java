@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
@@ -59,26 +60,11 @@ public class StateFunc {
 	 * @return combined sets (immutable)
 	 */
 	private static ValueFunc combineValue(List<ValueFunc> subs) {
-
-		ValueFunc.Builder builder = new ValueFunc.Builder();
-		for (ValueFunc fn : subs) {
-			builder.add(fn);
-		}
-
-		return builder.Build();
-
+		return ValueFunc.combine(subs);
 	}
-	
+
 	private static FilteredValueFunc combineFilteredValue(List<FilteredValueFunc> subs) {
-
-		ValueFunc.Builder values = new ValueFunc.Builder();
-		ValueFunc.Builder filters = new ValueFunc.Builder();
-		for (FilteredValueFunc fn : subs) {
-			values.add(fn.getValue());
-			filters.add(fn.getFilter());
-		}
-		return new FilteredValueFunc(values.Build(), filters.Build());
-
+		return FilteredValueFunc.combine(subs);
 	}
 
 	/**
@@ -88,14 +74,15 @@ public class StateFunc {
 	 * @return
 	 */
 	private static Map<ObjectDefinition, ValueFunc> combineAssigns(List<Map<ObjectDefinition, ValueFunc>> subs) {
-		return combineMap(subs,StateFunc::combineValue);
+		return combineMap(subs, StateFunc::combineValue);
 	}
 
-	private static Map<ObjectDefinition, FilteredValueFunc> combineUpdates(List<Map<ObjectDefinition, FilteredValueFunc>> subs) {
-		return combineMap(subs,StateFunc::combineFilteredValue);
+	private static Map<ObjectDefinition, FilteredValueFunc> combineUpdates(
+			List<Map<ObjectDefinition, FilteredValueFunc>> subs) {
+		return combineMap(subs, StateFunc::combineFilteredValue);
 	}
-	
-	private static <K,V> Map<K, V> combineMap(List<Map<K, V>> subs,Function<List<V>,V> valueCombiner) {
+
+	private static <K, V> Map<K, V> combineMap(List<Map<K, V>> subs, Function<List<V>, V> valueCombiner) {
 		subs = new ArrayList<>(subs);
 		subs.removeIf(Map::isEmpty);
 
@@ -106,7 +93,7 @@ public class StateFunc {
 		if (subs.size() == 1) {
 			return subs.get(0);
 		}
-		
+
 		ImmutableMap.Builder<K, V> as = ImmutableMap.builder();
 		subs.stream().flatMap(s -> s.entrySet().stream())
 				.collect(groupingBy(e -> e.getKey(), mapping(e -> e.getValue(), toList())))
@@ -114,7 +101,7 @@ public class StateFunc {
 		;
 
 		return as.build();
-	}	
+	}
 
 	public static StateFunc combine(List<StateFunc> subs) {
 		subs = new ArrayList<>(subs);
@@ -201,6 +188,16 @@ public class StateFunc {
 		}
 	}
 
+	private static FilteredValueFunc applyFilteredValue(FilteredValueFunc fv,
+			Map<ObjectDefinition, StateFunc> parameterValues) {
+		ValueFunc v = applyValue(fv.getValue(), parameterValues);
+		ValueFunc f = applyValue(fv.getFilter(), parameterValues);
+		if (v == fv.getValue() && f == fv.getFilter()) {
+			return fv;
+		}
+		return new FilteredValueFunc(v, f);
+	}
+
 	private static Map<ObjectDefinition, ValueFunc> applyAssigns(Map<ObjectDefinition, ValueFunc> assigns,
 			Map<ObjectDefinition, StateFunc> parameterValues) {
 		boolean nochange = true;
@@ -234,6 +231,40 @@ public class StateFunc {
 
 	}
 
+	private static Map<ObjectDefinition, FilteredValueFunc> applyUpdates(Map<ObjectDefinition, FilteredValueFunc> updates,
+			Map<ObjectDefinition, StateFunc> parameterValues) {
+		boolean nochange = true;
+	
+		ImmutableMap.Builder<ObjectDefinition, FilteredValueFunc>  as = ImmutableMap.builder();
+		for (Entry<ObjectDefinition, FilteredValueFunc>  e : updates.entrySet()) {
+			FilteredValueFunc v = applyFilteredValue(e.getValue(), parameterValues);
+			if (v != e.getValue()) {
+				nochange = false;
+			}
+			// f(a,out b) = { b = a+b } --> assigns = b: a,b f(x,y) ---> x:x,y
+			if (parameterValues.containsKey(e.getKey())) {
+				StateFunc lvalue = parameterValues.get(e.getKey());
+				nochange = false;
+				// TODO check it is a lvalue
+				Preconditions.checkState(lvalue.assigns.isEmpty());
+				Preconditions.checkState(lvalue.updates.isEmpty());
+				Preconditions.checkState(lvalue.value.getObjects().isEmpty());
+				Preconditions.checkState(lvalue.value.getParameters().size() == 1);
+				as.put(lvalue.getValue().getParameters().iterator().next(), v);
+
+			} else {
+				as.put(e.getKey(), v);
+			}
+
+		}
+		if (nochange) {
+			return updates;
+		} else {
+			return as.build();
+		}
+
+	}
+
 	public StateFunc apply(Map<ObjectDefinition, StateFunc> parameterValues) {
 		// (1) mutate s(f) to s2(f) with param value paramI.ValueFunc.
 		// (2) return combine ( s2(f) s(param1) s(param2) s param(3) )
@@ -244,7 +275,7 @@ public class StateFunc {
 		m1.value = applyValue(this.value, parameterValues);
 		m1.branchCond = applyValue(this.branchCond, parameterValues);
 		m1.assigns = applyAssigns(this.getAssigns(), parameterValues);
-		m1.updates = applyAssigns(this.getUpdates(), parameterValues);
+		m1.updates = applyUpdates(this.getUpdates(), parameterValues);
 		List<StateFunc> f = new ArrayList<>(parameterValues.values());
 		f.add(m1);
 		StateFunc m2 = combine(f);
