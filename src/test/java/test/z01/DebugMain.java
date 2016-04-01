@@ -52,7 +52,7 @@ public class DebugMain {
 	}
 
 	private void printInstBuffer(InstBuffer buffer) {
-		for (Instruction<State> inst : buffer.getInstbuffer()) {
+		for (Instruction inst : buffer.getInstbuffer()) {
 			Object obj = inst.getDebugInfo();
 			System.out.println(obj.toString());
 			// if (obj instanceof SelectStmtData) {

@@ -953,7 +953,7 @@ returns [ SubQuery q ]
 //locals [ List<SubQuery> tables, List<Integer> groupbypositions = new ArrayList<>()  ]
  : ( K_SELECT | K_SEL ) ( K_UNIQUE /* WTF */ | K_DISTINCT | K_ALL | K_TOP NUMERIC_LITERAL K_PERCENT? (K_WITH K_TIES)? )?
     r+=result_column  ( ',' r+=result_column  )*
-   ( K_INTO variable_name ( ',' variable_name)* )? /* PL/SQL SELECT INTO */
+   ( K_INTO v+=variable_name ( ',' v+=variable_name)* )? /* PL/SQL SELECT INTO */
    ( K_FROM jc=join_clause )?
    ( g1=grouping_by_clause )? /* WTF */
    ( w1=where_clause )?

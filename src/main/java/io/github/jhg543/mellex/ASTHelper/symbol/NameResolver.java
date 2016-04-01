@@ -10,6 +10,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
 
@@ -57,6 +58,14 @@ public class NameResolver {
 
 	}
 
+	public VariableDefinition searchVariable(String name)
+	{
+		ObjectDefinition result = local.searchByName(name);
+		if (result != null && result instanceof VariableDefinition) {
+			return (VariableDefinition) result;
+		}
+		return null;
+	}
 	/**
 	 * 
 	 * @param name

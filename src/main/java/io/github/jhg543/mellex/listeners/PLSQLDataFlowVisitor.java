@@ -107,6 +107,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.While_loop_statemen
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.WindowContext;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.flowmfp.InstBuffer;
+import io.github.jhg543.mellex.listeners.flowmfp.InstFuncHelper;
 import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
 import io.github.jhg543.mellex.listeners.flowmfp.PatchList;
 import io.github.jhg543.mellex.listeners.flowmfp.State;
@@ -130,6 +131,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	private static StateFunc funcOfExpr(Object expr) {
 		return ((ExprAnalyzeResult) expr).getTransformation();
+	}
+
+	private static Object CollectDebugInfo(Object... objects) {
+		return objects;
 	}
 
 	private TableDefinitionProvider provider;
@@ -182,7 +187,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			ins.setDebugInfo(ctx.getStart().getLine());
 			Influences inf = ctx.selector.inf;
 			ins.setFunc(state -> {
-				
 
 				return null;
 			});
@@ -265,7 +269,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitCreate_table_stmt(Create_table_stmtContext ctx) {
-		// TODO the source table data
 		String tableName = ctx.obj.getText();
 		TableDefinition def = new TableDefinition(tableName, ctx.isvolatile, false);
 
@@ -273,15 +276,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			def.setSessionScoped(true);
 		}
 		if (ctx.def != null) {
+			// create table t ( a number(2),b number 20)
 			List<String> colnames = (List<String>) ctx.def.accept(this);
 			for (String colname : colnames) {
 				def.addColumn(colname);
-
 			}
 			nameResolver.defineTable(tableName, def);
 		} else {
 			Object ss = ctx.st.accept(this);
 			if (ss instanceof String) {
+				// create table t as schema.table;
 				TableDefinition sourceTableDef = nameResolver.searchTable((String) ss);
 				List<StateFunc> subs = new ArrayList<>();
 				for (ColumnDefinition srcColDef : sourceTableDef.getColumns()) {
@@ -292,10 +296,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 				}
 				nameResolver.defineTable(tableName, def);
 				if (!ctx.st.nodata) {
-					instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
-
+					instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
+							CollectDebugInfo(def.getColumns(), subs)));
 				}
 			} else {
+				// create table t as select cc from tt;
 				SelectStmtData selectStmt = (SelectStmtData) ss;
 				List<StateFunc> subs = new ArrayList<>();
 				for (ResultColumn rc : selectStmt.getColumns()) {
@@ -304,7 +309,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 				}
 				nameResolver.defineTable(tableName, def);
 				if (!ctx.st.nodata) {
-					instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(), subs)));
+					instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
+							CollectDebugInfo(def.getColumns(), subs)));
 				}
 			}
 		}
@@ -335,8 +341,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		}
 
-		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(def.getColumns(),
-				selectStmt.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList()))));
+		List<StateFunc> subs = selectStmt.getColumns().stream().map(rc -> rc.getExpr()).collect(Collectors.toList());
+		instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
+				CollectDebugInfo(def.getColumns(), subs)));
 
 		return null;
 	}
@@ -495,7 +502,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 						ctx.getStart().getCharPositionInLine());
 				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
 			} else if (def instanceof VariableDefinition) {
-				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)),(VariableDefinition) def);
+				return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of((VariableDefinition) def)),
+						(VariableDefinition) def);
 			}
 
 			// if here , it's deferred resultcolumn resolution in
@@ -602,7 +610,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		Preconditions.checkState(cdefs.size() == exprs.size(), "Column size %d != expr size %d", cdefs.size(), exprs.size());
 		// TODO REMOVE SELF ASSIGN FROM LIST
 
-		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(cdefs, exprs), CollectDebugInfo(cdefs, exprs)));
+
 		return null;
 	}
 
@@ -851,6 +860,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		nameResolver.exitSelectStmt(ctx);
 		ss.getColumns().forEach(rc -> rc.setExpr(rc.getExpr().addWhereClause(combinedClause)));
+		
+		if (ctx.v.size()>0)
+		{
+			List<VariableDefinition> intos = ctx.v.stream().map(vctx->nameResolver.searchVariable(vctx.getText())).collect(Collectors.toList());
+            ss.setIntos(intos);		
+		}
 		return ss;
 
 		// TODO implement "INTO" clause
@@ -889,6 +904,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		SelectStmtData sv0 = svs.get(0);
 		if (svs.size() == 1) {
+			// must be here since it preserves "INTO" clause
 			return sv0;
 		}
 
@@ -972,17 +988,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		targetTableDef = nameResolver.searchTable(tableName);
 		if (targetTableDef == null) {
 			targetTableDef = nameResolver.getAliasTableDefinition(tableName);
-			// if (targetTableDef == null)
-			// {
-			// if (metaGuessEnabled)
-			// {
-			//
-			// }
-			// else
-			// {
-			// throw new IllegalStateException("");
-			// }
-			// }
+			// if guessEnabled it will be created
+//			if (targetTableDef == null) {
+//				if (metaGuessEnabled) {
+//				} else {
+//					throw new IllegalStateException("");
+//				}
+//			}
 			tableName = targetTableDef.getName();
 		}
 
@@ -1008,7 +1020,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 		nameResolver.exitSelectStmt(ctx);
 
-		instbuffer.add(new Instruction(StateFunc.combineInsertOrUpdate(cdefs, exprs)));
+		instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(cdefs, exprs), CollectDebugInfo(cdefs, exprs)));
 		return null;
 	}
 
@@ -1021,8 +1033,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	@Override
 	public PatchList visitWhile_loop_statement(While_loop_statementContext ctx) {
 		StateFunc exprf = StateFunc.of().addWhereClause(funcOfExpr(ctx.expr().accept(this)));
-		
-		
+
 		return null;
 	}
 

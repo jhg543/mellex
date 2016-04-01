@@ -34,8 +34,9 @@ public class Instruction {
 		this.debugInfo = debugInfo;
 	}
 
-	public Instruction(Object debugInfo) {
+	public Instruction(Function<State, State> func, Object debugInfo) {
 		super();
+		this.func = func;
 		this.debugInfo = debugInfo;
 	}
 

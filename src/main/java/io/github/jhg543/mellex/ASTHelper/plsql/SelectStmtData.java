@@ -11,6 +11,16 @@ import com.google.common.base.Preconditions;
 public class SelectStmtData {
 	protected List<ResultColumn> columns;
 	protected Map<String, Integer> nameIndexMap; // index is 0 based
+	protected List<VariableDefinition> intos;
+	
+	
+	public List<VariableDefinition> getIntos() {
+		return intos;
+	}
+
+	public void setIntos(List<VariableDefinition> intos) {
+		this.intos = intos;
+	}
 
 	/**
 	 * do not modify it.

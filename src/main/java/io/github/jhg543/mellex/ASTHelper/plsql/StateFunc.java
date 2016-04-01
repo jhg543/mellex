@@ -161,19 +161,19 @@ public class StateFunc {
 		return s;
 	}
 
-	private static ValueFunc applyValue(ValueFunc v, Map<ObjectDefinition, StateFunc> parameterValues) {
+	private static ValueFunc applyValue(ValueFunc v, Map<ObjectDefinition, ValueFunc> parameterValues) {
 		boolean nochange = true;
 		ImmutableSet.Builder<ObjectReference> objs = ImmutableSet.builder();
 		objs.addAll(v.getObjects());
 		ImmutableSet.Builder<ObjectDefinition> params = ImmutableSet.builder();
 		for (ObjectDefinition param : v.getParameters()) {
-			StateFunc s = parameterValues.get(param);
+			ValueFunc s = parameterValues.get(param);
 			if (s == null) {
 				params.add(param);
 			} else {
 				nochange = false;
-				params.addAll(s.getValue().getParameters());
-				objs.addAll(s.getValue().getObjects());
+				params.addAll(s.getParameters());
+				objs.addAll(s.getObjects());
 			}
 		}
 
@@ -189,7 +189,7 @@ public class StateFunc {
 	}
 
 	private static FilteredValueFunc applyFilteredValue(FilteredValueFunc fv,
-			Map<ObjectDefinition, StateFunc> parameterValues) {
+			Map<ObjectDefinition, ValueFunc> parameterValues) {
 		ValueFunc v = applyValue(fv.getValue(), parameterValues);
 		ValueFunc f = applyValue(fv.getFilter(), parameterValues);
 		if (v == fv.getValue() && f == fv.getFilter()) {
@@ -199,7 +199,7 @@ public class StateFunc {
 	}
 
 	private static Map<ObjectDefinition, ValueFunc> applyAssigns(Map<ObjectDefinition, ValueFunc> assigns,
-			Map<ObjectDefinition, StateFunc> parameterValues) {
+			Map<ObjectDefinition, ValueFunc> parameterValues) {
 		boolean nochange = true;
 		ImmutableMap.Builder<ObjectDefinition, ValueFunc> as = ImmutableMap.builder();
 		for (Entry<ObjectDefinition, ValueFunc> e : assigns.entrySet()) {
@@ -209,14 +209,14 @@ public class StateFunc {
 			}
 			// f(a,out b) = { b = a+b } --> assigns = b: a,b f(x,y) ---> x:x,y
 			if (parameterValues.containsKey(e.getKey())) {
-				StateFunc lvalue = parameterValues.get(e.getKey());
+				ValueFunc lvalue = parameterValues.get(e.getKey());
 				nochange = false;
 				// TODO check it is a lvalue
-				Preconditions.checkState(lvalue.assigns.isEmpty());
-				Preconditions.checkState(lvalue.updates.isEmpty());
-				Preconditions.checkState(lvalue.value.getObjects().isEmpty());
-				Preconditions.checkState(lvalue.value.getParameters().size() == 1);
-				as.put(lvalue.getValue().getParameters().iterator().next(), v);
+//				Preconditions.checkState(lvalue.assigns.isEmpty());
+//				Preconditions.checkState(lvalue.updates.isEmpty());
+				Preconditions.checkState(lvalue.getObjects().isEmpty());
+				Preconditions.checkState(lvalue.getParameters().size() == 1);
+				as.put(lvalue.getParameters().iterator().next(), v);
 
 			} else {
 				as.put(e.getKey(), v);
@@ -232,7 +232,7 @@ public class StateFunc {
 	}
 
 	private static Map<ObjectDefinition, FilteredValueFunc> applyUpdates(Map<ObjectDefinition, FilteredValueFunc> updates,
-			Map<ObjectDefinition, StateFunc> parameterValues) {
+			Map<ObjectDefinition, ValueFunc> parameterValues) {
 		boolean nochange = true;
 	
 		ImmutableMap.Builder<ObjectDefinition, FilteredValueFunc>  as = ImmutableMap.builder();
@@ -243,14 +243,14 @@ public class StateFunc {
 			}
 			// f(a,out b) = { b = a+b } --> assigns = b: a,b f(x,y) ---> x:x,y
 			if (parameterValues.containsKey(e.getKey())) {
-				StateFunc lvalue = parameterValues.get(e.getKey());
+				ValueFunc lvalue = parameterValues.get(e.getKey());
 				nochange = false;
 				// TODO check it is a lvalue
-				Preconditions.checkState(lvalue.assigns.isEmpty());
-				Preconditions.checkState(lvalue.updates.isEmpty());
-				Preconditions.checkState(lvalue.value.getObjects().isEmpty());
-				Preconditions.checkState(lvalue.value.getParameters().size() == 1);
-				as.put(lvalue.getValue().getParameters().iterator().next(), v);
+//				Preconditions.checkState(lvalue.assigns.isEmpty());
+//				Preconditions.checkState(lvalue.updates.isEmpty());
+				Preconditions.checkState(lvalue.getObjects().isEmpty());
+				Preconditions.checkState(lvalue.getParameters().size() == 1);
+				as.put(lvalue.getParameters().iterator().next(), v);
 
 			} else {
 				as.put(e.getKey(), v);
@@ -271,11 +271,14 @@ public class StateFunc {
 		if (parameterValues.isEmpty()) {
 			return this;
 		}
+		
+		Map<ObjectDefinition,ValueFunc> varp = new HashMap<>();
+		parameterValues.forEach((k,v)->varp.put(k, v.getValue()));
 		StateFunc m1 = new StateFunc();
-		m1.value = applyValue(this.value, parameterValues);
-		m1.branchCond = applyValue(this.branchCond, parameterValues);
-		m1.assigns = applyAssigns(this.getAssigns(), parameterValues);
-		m1.updates = applyUpdates(this.getUpdates(), parameterValues);
+		m1.value = applyValue(this.value, varp);
+		m1.branchCond = applyValue(this.branchCond, varp);
+		m1.assigns = applyAssigns(this.getAssigns(), varp);
+		m1.updates = applyUpdates(this.getUpdates(), varp);
 		List<StateFunc> f = new ArrayList<>(parameterValues.values());
 		f.add(m1);
 		StateFunc m2 = combine(f);
@@ -283,6 +286,22 @@ public class StateFunc {
 		return m2;
 	}
 
+
+	public StateFunc applyState(Map<ObjectDefinition, ValueFunc> parameterValues) {
+		// (1) mutate s(f) to s2(f) with param value paramI.ValueFunc.
+		// (2) return combine ( s2(f) s(param1) s(param2) s param(3) )
+		if (parameterValues.isEmpty()) {
+			return this;
+		}
+		
+		StateFunc m1 = new StateFunc();
+		m1.value = applyValue(this.value, parameterValues);
+		m1.branchCond = applyValue(this.branchCond, parameterValues);
+		m1.assigns = applyAssigns(this.getAssigns(), parameterValues);
+		m1.updates = applyUpdates(this.getUpdates(), parameterValues);
+		return m1;
+	}	
+	
 	public StateFunc addWhereClause(StateFunc clause) {
 		StateFunc m1 = new StateFunc();
 		m1.value = this.value;

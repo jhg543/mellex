@@ -30,8 +30,10 @@ public class FunctionStateRecorder extends StateFunc {
 	}
 
 	public void addInsertOrUpdate(ColumnDefinition cdef, StateFunc sub) {
-		FilteredValueFunc fc = new FilteredValueFunc(sub.getValue(), sub.getBranchCond());
-		this.updates.merge(cdef, fc, (v1, v2) -> v1.add(v2));
+		if (cdef != null) {
+			FilteredValueFunc fc = new FilteredValueFunc(sub.getValue(), sub.getBranchCond());
+			this.updates.merge(cdef, fc, (v1, v2) -> v1.add(v2));
+		}
 		for (Entry<ObjectDefinition, FilteredValueFunc> e : sub.getUpdates().entrySet()) {
 			this.updates.merge(e.getKey(), e.getValue(), (v1, v2) -> v1.add(v2));
 		}
