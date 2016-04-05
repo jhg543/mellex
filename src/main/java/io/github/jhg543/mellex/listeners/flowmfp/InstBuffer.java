@@ -14,9 +14,10 @@ public class InstBuffer {
 		this.instbuffer = instbuffer;
 	}
 	
-	public void add(Instruction inst)
+	public PatchList add(Instruction inst)
 	{
 		instbuffer.add(inst);
+		return PatchList.singleInstrution(inst);
 	}
 	
 }

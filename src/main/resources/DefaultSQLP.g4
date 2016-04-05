@@ -217,7 +217,8 @@ plsql_statement_nolabel:
     | return_statement
     | sql_stmt
     | while_loop_statement
-    | assign_or_call_statement
+    | assign_statement
+    | call_statement
 ;
 /*
 lvalue
@@ -237,10 +238,13 @@ delete_call
     ;
 */
 
-assign_or_call_statement:
+assign_statement:
+    lvalue=expr ':=' rvalue=expr
+;
+
+call_statement:
     expr
-    | expr ':=' expr
-    ;
+;
 
 basic_loop_statement :
         K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
