@@ -39,33 +39,98 @@ public class NameResolver {
 
 	}
 
-	/**
-	 * 
-	 * @param name
-	 * @return not found = null
-	 */
-	public FunctionDefinition searchFunction(String name) {
-		ObjectDefinition result = local.searchByName(name);
-		if (result != null && result instanceof FunctionDefinition) {
-			return (FunctionDefinition) result;
-		}
-
-		result = global.searchByName(name);
-		if (result != null && result instanceof FunctionDefinition) {
-			return (FunctionDefinition) result;
-		}
-		return null;
-
+	public void addFromSubQuery(String alias, SelectStmtData subquery) {
+		this.alias.addFromSubQuery(alias, subquery);
 	}
 
-	public VariableDefinition searchVariable(String name)
+	public void addFromTable(String tableName, String alias) {
+		this.alias.addFromTable(tableName, alias);
+	}
+	public void collectResultColumnAlias(List<String> aliasList) {
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			ors.collectResultColumnAlias(aliasList);
+		}
+	}
+
+	public void defineVariable(String name,VariableDefinition def)
 	{
-		ObjectDefinition result = local.searchByName(name);
-		if (result != null && result instanceof VariableDefinition) {
-			return (VariableDefinition) result;
-		}
-		return null;
+		local.addDefinition(name, def);
 	}
+	
+	public void defineTable(String name, TableDefinition def) {
+		tableStorage.putTable(name, def);
+	}
+
+	public void enterFunctionDefinition(Object funcid) {
+		local.pushScope(funcid, false);
+	}
+
+	public void enterResultColumn(String alias) {
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			ors.newResultColumn(alias);
+		}
+	}
+
+	public void enterSelectStmt(Object scopeId) {
+		alias.pushScope(scopeId);
+		local.pushScope(scopeId, true);
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			ors.enterSelectStmt();
+		}
+	}
+
+	public void exitFunctionDefinition(Object funcid) {
+		local.popScope(funcid);
+	}
+
+	public void exitSelectStmt(Object scopeId) {
+		local.popScope(scopeId);
+		alias.popScope(scopeId);
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			ors.exitSelectStmt();
+		}
+	}
+
+	/**
+	 * this is used in ”update a1 from sometable a1"
+	 * 
+	 * @param alias
+	 * @return null if not found
+	 */
+	public TableDefinition getAliasTableDefinition(String alias) {
+		return (TableDefinition) this.alias.searchSubqueryOrCteOrLiveTable(alias);
+		
+	}
+	
+	
+
+	public boolean isGuessEnabled() {
+		return guessEnabled;
+	}
+
+	public void metBegin(Object scopeId) {
+		local.pushScope(scopeId, true);
+	}
+
+	public void metEnd(Object scopeId) {
+		local.popScope(scopeId);
+	}
+
+	public void popCte(String alias) {
+		this.alias.popCte(alias);
+	}
+
+	public void pushCte(String alias, SelectStmtData data) {
+		this.alias.pushCte(alias, data);
+	}
+
+	public SelectStmtData rewriteAfterResultColumns(SelectStmtData tempResult) {
+		if (vendor.equals(DatabaseVendor.TERADATA)) {
+			return ors.rewriteStateFunc(tempResult);
+		}
+		return tempResult;
+	}
+
 	/**
 	 * 
 	 * @param name
@@ -112,86 +177,22 @@ public class NameResolver {
 	}
 
 	/**
-	 * this is used in ”update a1 from sometable a1"
 	 * 
-	 * @param alias
-	 * @return null if not found
+	 * @param name
+	 * @return not found = null
 	 */
-	public TableDefinition getAliasTableDefinition(String alias) {
-		return (TableDefinition) this.alias.searchSubqueryOrCteOrLiveTable(alias);
-		
-	}
-
-	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {
-		return alias.wildCardAll(fileName, lineNumber, charPosition);
-	}
-
-	public List<Tuple2<String, StateFunc>> searchWildcardOneTable(String tableName, String fileName, int lineNumber,
-			int charPosition) {
-		return alias.wildCardOneTable(tableName, fileName, lineNumber, charPosition);
-	}
-
-	public void enterFunctionDefinition(Object funcid) {
-		local.pushScope(funcid, false);
-	}
-
-	public void metBegin(Object scopeId) {
-		local.pushScope(scopeId, true);
-	}
-
-	public void metEnd(Object scopeId) {
-		local.popScope(scopeId);
-	}
-
-	public void exitFunctionDefinition(Object funcid) {
-		local.popScope(funcid);
-	}
-
-	public void popCte(String alias) {
-		this.alias.popCte(alias);
-	}
-
-	public void pushCte(String alias, SelectStmtData data) {
-		this.alias.pushCte(alias, data);
-	}
-
-	public void enterSelectStmt(Object scopeId) {
-		alias.pushScope(scopeId);
-		local.pushScope(scopeId, true);
-		if (vendor.equals(DatabaseVendor.TERADATA)) {
-			ors.enterSelectStmt();
+	public FunctionDefinition searchFunction(String name) {
+		ObjectDefinition result = local.searchByName(name);
+		if (result != null && result instanceof FunctionDefinition) {
+			return (FunctionDefinition) result;
 		}
-	}
 
-	public void exitSelectStmt(Object scopeId) {
-		local.popScope(scopeId);
-		alias.popScope(scopeId);
-		if (vendor.equals(DatabaseVendor.TERADATA)) {
-			ors.exitSelectStmt();
+		result = global.searchByName(name);
+		if (result != null && result instanceof FunctionDefinition) {
+			return (FunctionDefinition) result;
 		}
-	}
+		return null;
 
-	public void enterResultColumn(String alias) {
-		if (vendor.equals(DatabaseVendor.TERADATA)) {
-			ors.newResultColumn(alias);
-		}
-	}
-
-	public void collectResultColumnAlias(List<String> aliasList) {
-		if (vendor.equals(DatabaseVendor.TERADATA)) {
-			ors.collectResultColumnAlias(aliasList);
-		}
-	}
-
-	public SelectStmtData rewriteAfterResultColumns(SelectStmtData tempResult) {
-		if (vendor.equals(DatabaseVendor.TERADATA)) {
-			return ors.rewriteStateFunc(tempResult);
-		}
-		return tempResult;
-	}
-
-	public void defineTable(String name, TableDefinition def) {
-		tableStorage.putTable(name, def);
 	}
 
 	/**
@@ -204,16 +205,22 @@ public class NameResolver {
 		return tableStorage.getTable(name);
 	}
 
-	public void addFromTable(String tableName, String alias) {
-		this.alias.addFromTable(tableName, alias);
+	public VariableDefinition searchVariable(String name)
+	{
+		ObjectDefinition result = local.searchByName(name);
+		if (result != null && result instanceof VariableDefinition) {
+			return (VariableDefinition) result;
+		}
+		return null;
 	}
 
-	public void addFromSubQuery(String alias, SelectStmtData subquery) {
-		this.alias.addFromSubQuery(alias, subquery);
+	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {
+		return alias.wildCardAll(fileName, lineNumber, charPosition);
 	}
 
-	public boolean isGuessEnabled() {
-		return guessEnabled;
+	public List<Tuple2<String, StateFunc>> searchWildcardOneTable(String tableName, String fileName, int lineNumber,
+			int charPosition) {
+		return alias.wildCardOneTable(tableName, fileName, lineNumber, charPosition);
 	}
 
 	public void setGuessEnabled(boolean guessEnabled) {

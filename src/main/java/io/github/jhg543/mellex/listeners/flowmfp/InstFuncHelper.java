@@ -204,4 +204,25 @@ public class InstFuncHelper {
 		};
 		return fff;
 	}
+	
+	public static Function<State, State> branchCondFunc(StateFunc branchCondDef)
+	{
+		Function<State, State> fff = (State s) -> {
+			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
+			AtomicBoolean stateModified = new AtomicBoolean(false);
+
+			StateFunc fn = applyState(branchCondDef, s);
+			metFn(fn, s, newVarState, stateModified);
+			s.getFuncState().addBranch(fn);
+
+			if (stateModified.get()) {
+				return new State(newVarState, s.getFuncState());
+			} else {
+				return s;
+			}
+
+		};
+
+		return fff;
+	}
 }

@@ -207,7 +207,7 @@ plsql_statement_nolabel:
     | exit_statement
     | fetch_statement
     | for_loop_statement
-    | forall_statement
+//    | forall_statement
     | goto_statement
     | if_statement
     | null_statement
@@ -305,12 +305,12 @@ dynamic_returning_clause :
 
 for_loop_statement :
 
-        K_FOR any_name K_IN ( ~(K_LOOP) )+ K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
+        K_FOR loopvar=any_name K_IN ( lb=expr '.' '.' rb=expr | cursorname=object_name | '(' ss=select_stmt ')' ) K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
-forall_statement :
-        K_FORALL any_name K_IN bounds_clause plsql_statement ( K_SAVE K_EXCEPTIONS )?
-    ;
+//forall_statement :
+//        K_FORALL any_name K_IN bounds_clause plsql_statement ( K_SAVE K_EXCEPTIONS )?
+//    ;
 
 while_loop_statement :
         K_WHILE expr K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
@@ -328,9 +328,9 @@ goto_statement :
     ;
 
 if_statement :
-        K_IF expr K_THEN multiple_plsql_stmt_list
-        ( K_ELSIF expr K_THEN multiple_plsql_stmt_list )*
-        ( K_ELSE multiple_plsql_stmt_list )?
+        K_IF selector_vals+=expr K_THEN then_stmts+=multiple_plsql_stmt_list
+        ( K_ELSIF selector_vals+=expr K_THEN then_stmts+=multiple_plsql_stmt_list )*
+        ( K_ELSE else_stmts=multiple_plsql_stmt_list )?
         K_END K_IF
     ;
 

@@ -6,6 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -41,6 +44,7 @@ import io.github.jhg543.mellex.ASTHelper.symbol.TableStorage;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Any_nameContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Assign_statementContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Basic_loop_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Call_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Case_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Column_defContext;
@@ -67,8 +71,10 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprLiteralContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprORContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprObjectContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.ExprSpecialFunctionContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.For_loop_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Grouping_by_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Having_clauseContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.If_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Insert_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Join_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.LabelContext;
@@ -111,6 +117,7 @@ import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.flowmfp.InstBuffer;
 import io.github.jhg543.mellex.listeners.flowmfp.InstFuncHelper;
 import io.github.jhg543.mellex.listeners.flowmfp.Instruction;
+import io.github.jhg543.mellex.listeners.flowmfp.LabelRecorder;
 import io.github.jhg543.mellex.listeners.flowmfp.PatchList;
 import io.github.jhg543.mellex.listeners.flowmfp.State;
 import io.github.jhg543.mellex.util.DatabaseVendor;
@@ -146,7 +153,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private String current_file;
 	private InstBuffer instbuffer;
 	private boolean metaGuessEnabled = true;
-
+	private LabelRecorder labelRecorder;
 	private ScopeStack scopeStack;
 
 	public PLSQLDataFlowVisitor(TokenStream stream, InstBuffer instbuffer, DatabaseVendor vendor, boolean metaGuessEnabled) {
@@ -155,6 +162,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		this.stream = stream;
 		this.instbuffer = instbuffer;
 		this.metaGuessEnabled = metaGuessEnabled;
+		this.labelRecorder = new LabelRecorder();
 		this.nameResolver = new NameResolver(vendor, new TableStorage(), metaGuessEnabled);
 	}
 
@@ -212,36 +220,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		return Tuple2.of(ctx.tn.getText(), data);
 	}
 
-	@Override
-	public Object visitCreate_procedure(Create_procedureContext ctx) {
-		/*
-		 * parameter_declarations? (K_RETURN datatype)? ( K_IS | K_AS )
-		 * declare_section? body
-		 */
-
-		FunctionDefinition functionDefinition = new FunctionDefinition();
-		ctx.object_name().accept(this);
-		functionDefinition.setName(ctx.object_name().getText());
-		List<VariableDefinition> parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
-		functionDefinition.setParameters(parameterDefinitions);
-
-		// push new scope , all outer variable are not visible
-		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions), false);
-
-		List<ObjectDefinition> objectDefinitions = Collections.EMPTY_LIST;
-		if (ctx.declare_section() != null) {
-			objectDefinitions = (List<ObjectDefinition>) ctx.declare_section().accept(this);
-		}
-		scopeStack.newBlock(objectDefinitions, true);
-
-		// pop decl
-		scopeStack.pop();
-
-		// pop parameter~
-		scopeStack.pop();
-		return null;
-
-	}
 
 	@Override
 	public Object visitCreate_source_table(Create_source_tableContext ctx) {
@@ -332,40 +310,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	}
 
-	@Override
-	public Object visitCursor_definition(Cursor_definitionContext ctx) {
-		CursorDefinition cursorDefinition = new CursorDefinition();
-		cursorDefinition.setName(ctx.any_name().getText());
-		List<VariableDefinition> parameterDefinitions = Collections.EMPTY_LIST;
-		if (ctx.parameter_declarations() != null) {
-			parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
-
-		}
-		cursorDefinition.setParameters(parameterDefinitions);
-
-		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions), false);
-		Select_stmtContext ssctx = ctx.select_stmt();
-		scopeStack.pop();
-
-		ssctx.accept(this);
-		cursorDefinition.setSelectInf(ssctx.q);
-
-		return cursorDefinition;
-	}
-
-	@Override
-	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
-		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
-		for (Declare_section_onelineContext vd : ctx.declare_section_oneline()) {
-			decls.add((ObjectDefinition) vd.accept(this));
-		}
-		return decls;
-	}
-
-	@Override
-	public ObjectDefinition visitDeclare_section_oneline(Declare_section_onelineContext ctx) {
-		return (ObjectDefinition) visitChildren(ctx);
-	}
 
 	@Override
 	public Object visitDelete_stmt(Delete_stmtContext ctx) {
@@ -605,25 +549,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
-		PatchList patchList = new PatchList();
-		PatchList prevpl = null;
-		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
-			PatchList currentpl = (PatchList) plsqlctx.accept(this);
-			if (prevpl != null) {
-				for (Instruction ins : prevpl.getNextList()) {
-					ins.getNextPc().add(() -> currentpl.getStartInstruction());
-				}
-			} else {
-				patchList.setStartInstruction(currentpl.getStartInstruction());
-			}
-			prevpl = currentpl;
-		}
-		patchList.setNextList(prevpl.getNextList());
-		return patchList;
-	}
-
-	@Override
 	public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
 		SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
 		return instbuffer.add(new Instruction(InstFuncHelper.SelectFunc(ss), ss));
@@ -649,39 +574,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		return funcOfExpr(ctx.operand1.accept(this));
 	}
 
-	@Override
-	public VariableDefinition visitParameter_declaration(Parameter_declarationContext ctx) {
-		if (ctx.K_OUT() != null) {
-			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
-		}
-		VariableDefinition def = new VariableDefinition();
-		def.setName(ctx.any_name().getText());
-		ExprContext exprContext = ctx.expr();
-		if (exprContext != null) {
-			// TODO deal with expr
-		}
-		return def;
-	}
-
-	@Override
-	public List<VariableDefinition> visitParameter_declarations(Parameter_declarationsContext ctx) {
-		List<VariableDefinition> defs = new ArrayList<VariableDefinition>();
-		for (Parameter_declarationContext vd : ctx.parameter_declaration()) {
-			defs.add((VariableDefinition) vd.accept(this));
-		}
-		return defs;
-	}
-
-	@Override
-	public Object visitProcedure_or_function_declaration(Procedure_or_function_declarationContext ctx) {
-		throw new UnsupportedOperationException("FORWARD DECLARATION NOT SUPPORTED");
-	}
-
-	@Override
-	public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
 
 	@Override
 	public StateFunc visitQualify_clause(Qualify_clauseContext ctx) {
@@ -991,13 +883,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
-	public PatchList visitWhile_loop_statement(While_loop_statementContext ctx) {
-		StateFunc exprf = StateFunc.of().addWhereClause(funcOfExpr(ctx.expr().accept(this)));
-
-		return null;
-	}
-
-	@Override
 	public VariableDefinition visitVariable_declaration(Variable_declarationContext ctx) {
 		// COPY FROM visitParameter_declaration
 
@@ -1042,7 +927,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 			}
 			for (LabelContext labelctx : labels) {
 				String labelName = (String) labelctx.label_name().getText();
-				scopeStack.getLabels().put(labelName, patchList.getStartInstruction());
+				labelRecorder.getLabels().put(labelName, patchList.getStartInstruction());
 			}
 		}
 		return patchList;
@@ -1073,23 +958,258 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
+	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
+		PatchList patchList = new PatchList();
+		PatchList prevpl = null;
+		for (Plsql_statementContext plsqlctx : ctx.plsql_statement()) {
+			PatchList currentpl = (PatchList) plsqlctx.accept(this);
+			if (currentpl != null) {
+				if (prevpl != null) {
+					for (Instruction ins : prevpl.getNextList()) {
+						ins.addNextInstruction(currentpl.getStartInstruction());
+					}
+				} else {
+					patchList.setStartInstruction(currentpl.getStartInstruction());
+				}
+				prevpl = currentpl;
+			}
+		}
+		if (prevpl != null) {
+			patchList.setNextList(prevpl.getNextList());
+			return patchList;
+		} else {
+			// no instruction put
+			patchList = instbuffer.add(
+					new Instruction(InstFuncHelper.NopFunc(), "NOP @" + ctx.getStart().getText() + ctx.getStart().getLine()));
+			return patchList;
+		}
+	}
+
+	@Override
 	public PatchList visitCase_statement(Case_statementContext ctx) {
 		PatchList p = new PatchList();
 		if (ctx.selector != null) {
 			StateFunc fn = funcOfExpr(ctx.selector.accept(this));
-			Instruction si = null;
-			// TODO ... 
+			Instruction si = new Instruction(InstFuncHelper.branchCondFunc(fn), fn);
+			instbuffer.add(si);
 			p.setStartInstruction(si);
 		}
 
-		for (int i=0;i<ctx.selector_vals.size();++i)
-		{
+		Instruction prevBranch = null;
+		for (int i = 0; i < ctx.selector_vals.size(); ++i) {
 			StateFunc fn = funcOfExpr(ctx.selector_vals.get(i).accept(this));
-			Instruction si = null;
-			
+			Instruction caseSelectorVal = new Instruction(InstFuncHelper.branchCondFunc(fn), fn);
+			instbuffer.add(caseSelectorVal);
+			PatchList thenblock = (PatchList) ctx.then_stmts.get(i).accept(this);
+			caseSelectorVal.addNextInstruction(thenblock.getStartInstruction());
+			p.getNextList().addAll(thenblock.getNextList());
+			if (prevBranch == null) {
+				// first case
+				if (p.getStartInstruction() == null) {
+					// no selector
+					p.setStartInstruction(caseSelectorVal);
+				} else {
+					p.getStartInstruction().addNextInstruction(caseSelectorVal);
+				}
+			} else {
+				prevBranch.addNextInstruction(caseSelectorVal);
+			}
+
+			prevBranch = caseSelectorVal;
 		}
-		return null;
+
+		if (ctx.else_stmts != null) {
+			PatchList elseblock = (PatchList) ctx.else_stmts.accept(this);
+			prevBranch.addNextInstruction(elseblock.getStartInstruction());
+			p.getNextList().addAll(elseblock.getNextList());
+		} else {
+			p.getNextList().add(prevBranch);
+		}
+		return p;
 	}
+
+	@Override
+	public PatchList visitIf_statement(If_statementContext ctx) {
+		// copied for "case" statement
+		PatchList p = new PatchList();
+
+		Instruction prevBranch = null;
+		for (int i = 0; i < ctx.selector_vals.size(); ++i) {
+			StateFunc fn = funcOfExpr(ctx.selector_vals.get(i).accept(this));
+			Instruction caseSelectorVal = new Instruction(InstFuncHelper.branchCondFunc(fn), fn);
+			instbuffer.add(caseSelectorVal);
+			PatchList thenblock = (PatchList) ctx.then_stmts.get(i).accept(this);
+			caseSelectorVal.addNextInstruction(thenblock.getStartInstruction());
+			p.getNextList().addAll(thenblock.getNextList());
+			if (prevBranch == null) {
+				p.setStartInstruction(caseSelectorVal);
+			} else {
+				prevBranch.addNextInstruction(caseSelectorVal);
+			}
+
+			prevBranch = caseSelectorVal;
+		}
+
+		if (ctx.else_stmts != null) {
+			PatchList elseblock = (PatchList) ctx.else_stmts.accept(this);
+			prevBranch.addNextInstruction(elseblock.getStartInstruction());
+			p.getNextList().addAll(elseblock.getNextList());
+		} else {
+			p.getNextList().add(prevBranch);
+		}
+		return p;
+	}
+
+	@Override
+	public PatchList visitBasic_loop_statement(Basic_loop_statementContext ctx) {
+		labelRecorder.enterLoop();
+		PatchList stmts = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+		Instruction first = stmts.getStartInstruction();
+		for (Instruction topatch : stmts.getNextList()) {
+			topatch.addNextInstruction(first);
+		}
+		PatchList p = new PatchList();
+		p.setStartInstruction(first);
+
+		p.getNextList().addAll(labelRecorder.getCurrentBreaks());
+		labelRecorder.getCurrentContinues().forEach(i -> i.addNextInstruction(first));
+		if (ctx.label_name() != null) {
+			String label = ctx.label_name().getText();
+			// TODO if duplicate label?
+			Optional.ofNullable(labelRecorder.getBreakLabels().remove(label)).ifPresent(p.getNextList()::addAll);
+			Optional.ofNullable(labelRecorder.getContinueLabels().remove(label))
+					.ifPresent(list -> list.forEach(i -> i.addNextInstruction(first)));
+		}
+
+		labelRecorder.exitLoop();
+		return p;
+	}
+
+	@Override
+	public PatchList visitWhile_loop_statement(While_loop_statementContext ctx) {
+		PatchList p = new PatchList();
+		
+		
+		StateFunc whileCond = funcOfExpr(ctx.expr().accept(this));
+		Instruction condInst = new Instruction(InstFuncHelper.branchCondFunc(whileCond), whileCond);
+		p.setStartInstruction(condInst);
+		
+		labelRecorder.enterLoop();
+		PatchList stmts = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+		
+		condInst.addNextInstruction(stmts.getStartInstruction());
+		for (Instruction topatch : stmts.getNextList()) {
+			topatch.addNextInstruction(condInst);
+		}
+
+		p.getNextList().addAll(labelRecorder.getCurrentBreaks());
+		p.getNextList().add(condInst);
+		labelRecorder.getCurrentContinues().forEach(i -> i.addNextInstruction(condInst));
+		if (ctx.label_name() != null) {
+			String label = ctx.label_name().getText();
+			// TODO if duplicate label?
+			Optional.ofNullable(labelRecorder.getBreakLabels().remove(label)).ifPresent(p.getNextList()::addAll);
+			Optional.ofNullable(labelRecorder.getContinueLabels().remove(label))
+					.ifPresent(list -> list.forEach(i -> i.addNextInstruction(condInst)));
+		}
+
+		labelRecorder.exitLoop();
+		return p;
+	}
+
+	@Override
+	public Object visitFor_loop_statement(For_loop_statementContext ctx) {
+		// TODO Auto-generated method stub
+		return super.visitFor_loop_statement(ctx);
+	}
+
+	
+
+	@Override
+	public Object visitCreate_procedure(Create_procedureContext ctx) {
+		/*
+		 * parameter_declarations? (K_RETURN datatype)? ( K_IS | K_AS )
+		 * declare_section? body
+		 */
+
+		FunctionDefinition functionDefinition = new FunctionDefinition();
+		ctx.object_name().accept(this);
+		functionDefinition.setName(ctx.object_name().getText());
+		List<VariableDefinition> parameterDefinitions = (List<VariableDefinition>) ctx.parameter_declarations().accept(this);
+		functionDefinition.setParameters(parameterDefinitions);
+
+		// push new scope , all outer variable are not visible
+		scopeStack.newBlock(ImmutableList.copyOf(parameterDefinitions), false);
+
+		List<ObjectDefinition> objectDefinitions = Collections.EMPTY_LIST;
+		if (ctx.declare_section() != null) {
+			objectDefinitions = (List<ObjectDefinition>) ctx.declare_section().accept(this);
+		}
+		scopeStack.newBlock(objectDefinitions, true);
+
+		// pop decl
+		scopeStack.pop();
+
+		// pop parameter~
+		scopeStack.pop();
+		return null;
+
+	}
+	
+
+	@Override
+	public Object visitCursor_definition(Cursor_definitionContext ctx) {
+		throw new UnsupportedOperationException("not implemented");
+		//TODO INPLEMENT
+	}
+
+	@Override
+	public List<ObjectDefinition> visitDeclare_section(Declare_sectionContext ctx) {
+		List<ObjectDefinition> decls = new ArrayList<ObjectDefinition>();
+		for (Declare_section_onelineContext vd : ctx.declare_section_oneline()) {
+			decls.add((ObjectDefinition) vd.accept(this));
+		}
+		return decls;
+	}
+
+	@Override
+	public ObjectDefinition visitDeclare_section_oneline(Declare_section_onelineContext ctx) {
+		return (ObjectDefinition) visitChildren(ctx);
+	}	
+
+	@Override
+	public VariableDefinition visitParameter_declaration(Parameter_declarationContext ctx) {
+		if (ctx.K_OUT() != null) {
+			throw new UnsupportedOperationException("OUT PARAMETER NOT IMPLEMENTED");
+		}
+		VariableDefinition def = new VariableDefinition();
+		def.setName(ctx.any_name().getText());
+		ExprContext exprContext = ctx.expr();
+		if (exprContext != null) {
+			// TODO deal with expr
+		}
+		return def;
+	}
+
+	@Override
+	public List<VariableDefinition> visitParameter_declarations(Parameter_declarationsContext ctx) {
+		List<VariableDefinition> defs = new ArrayList<VariableDefinition>();
+		for (Parameter_declarationContext vd : ctx.parameter_declaration()) {
+			defs.add((VariableDefinition) vd.accept(this));
+		}
+		return defs;
+	}
+
+	@Override
+	public Object visitProcedure_or_function_declaration(Procedure_or_function_declarationContext ctx) {
+		throw new UnsupportedOperationException("FORWARD DECLARATION NOT SUPPORTED");
+	}
+
+	@Override
+	public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
+		// TODO Auto-generated method stub
+		return null;
+	}	
 }
 
 /*

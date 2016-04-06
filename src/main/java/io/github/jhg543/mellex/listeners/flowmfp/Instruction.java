@@ -40,4 +40,12 @@ public class Instruction {
 		this.debugInfo = debugInfo;
 	}
 
+	/**
+	 * shortcut for add instruction
+	 * @param i
+	 */
+	public void addNextInstruction(Instruction i)
+	{
+		getNextPc().add(()->i);
+	}
 }
