@@ -11,6 +11,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ControlBlock;
+import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 
@@ -22,13 +23,13 @@ public class LocalObjectResolver {
 	private LinkedList<Scope> scopes = new LinkedList<>();
 	private static Splitter dotsplitter = Splitter.on('.');
 
-	public ObjectDefinition searchByName(String name) {
+	public VariableDefinition searchVariable(String name) {
 
 		List<String> namedotsplit = dotsplitter.splitToList(name);
 		if (namedotsplit.size() == 1) {
-			return searchBySimpleName(name);
+			return searchVariableBySimpleName(name);
 		} else if (namedotsplit.size() == 2) {
-			ObjectDefinition d = searchBySimpleName(namedotsplit.get(0));
+			VariableDefinition d = searchVariableBySimpleName(namedotsplit.get(0));
 			if (d == null) {
 				return null;
 			}
@@ -47,11 +48,11 @@ public class LocalObjectResolver {
 
 	}
 
-	private ObjectDefinition searchBySimpleName(String name) {
+	private VariableDefinition searchVariableBySimpleName(String name) {
 		// assume no "." in name
 		for (Scope s : scopes) {
-			Map<String, ObjectDefinition> m = s.getContent();
-			ObjectDefinition d = m.get(name);
+			Map<String, VariableDefinition> m = s.getVariables();
+			VariableDefinition d = m.get(name);
 			if (d != null) {
 				return d;
 			}
@@ -62,37 +63,49 @@ public class LocalObjectResolver {
 		return null;
 	}
 
-	public <T> T searchByName(String name, Class<T> expectedClass) {
-		ObjectDefinition d = searchByName(name);
-		if (expectedClass.isInstance(d)) {
-			return (T) d;
-		} else {
-			return null;
+
+
+	public FunctionDefinition searchFunction(String name) {
+		for (Scope s : scopes) {
+			Map<String, FunctionDefinition> m = s.getFunctions();
+			FunctionDefinition d = m.get(name);
+			if (d != null) {
+				return d;
+			}
+			if (!s.isParentScopeVisible()) {
+				return null;
+			}
 		}
-
+		return null;
 	}
-
+	
 	public void pushScope(Object scopeId, boolean parentScopeVisible) {
 		Scope s = new Scope();
 		s.setId(scopeId);
 		s.setParentScopeVisible(parentScopeVisible);
-		s.setContent(new HashMap<>());
+		s.setFunctions(new HashMap<>());
+		s.setVariables(new HashMap<>());
 		this.scopes.push(s);
+	}
+	
+	public Object getCurrentScopeId()
+	{
+		return this.scopes.peek().getId();
 	}
 
 	public void popScope(Object expectedScopeId) {
 		Preconditions.checkState(expectedScopeId == this.scopes.pop().getId(), "popped scope is not as expected");
 	}
 
-	public void addDefinition(String name, ObjectDefinition def) {
-		def.setName(name);
-		Preconditions.checkState(this.scopes.peek().getContent().put(name, def) == null, "duplicate object name %s", name);
+	public void addVariableDefinition( VariableDefinition def) {
+		Preconditions.checkState(this.scopes.peek().getVariables().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
 	}
 
 	private static class Scope {
 		Object id;
 		boolean parentScopeVisible;
-		Map<String, ObjectDefinition> content;
+		Map<String, VariableDefinition> variables;
+		Map<String, FunctionDefinition> functions;
 
 		public Object getId() {
 			return id;
@@ -110,13 +123,22 @@ public class LocalObjectResolver {
 			this.parentScopeVisible = parentScopeVisible;
 		}
 
-		public Map<String, ObjectDefinition> getContent() {
-			return content;
+		public Map<String, VariableDefinition> getVariables() {
+			return variables;
 		}
 
-		public void setContent(Map<String, ObjectDefinition> content) {
-			this.content = content;
+		public void setVariables(Map<String, VariableDefinition> variables) {
+			this.variables = variables;
 		}
+
+		public Map<String, FunctionDefinition> getFunctions() {
+			return functions;
+		}
+
+		public void setFunctions(Map<String, FunctionDefinition> functions) {
+			this.functions = functions;
+		}
+
 
 	}
 }

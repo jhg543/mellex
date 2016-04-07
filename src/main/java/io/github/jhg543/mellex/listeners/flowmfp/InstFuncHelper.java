@@ -1,6 +1,7 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ public class InstFuncHelper {
 	}
 
 	private static List<Object> applyPossibleLiteralValue(List<Object> def, State s) {
+
 		List<Object> result = new ArrayList<>();
 		for (Object o : def) {
 			if (o instanceof String) {
@@ -49,7 +51,11 @@ public class InstFuncHelper {
 				result.add(o);
 			}
 		}
-		return result;
+		if (result.isEmpty()) {
+			return Collections.emptyList();
+		} else {
+			return result;
+		}
 	}
 
 	private static StateFunc metInsertColumn(ColumnDefinition cdef, StateFunc fn, State s,
@@ -117,7 +123,8 @@ public class InstFuncHelper {
 
 			// TODO possible literal
 
-			newVarState.put(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()), applyPossibleLiteralValue(exprDefinition.getLiteralValue(),s)));
+			newVarState.put(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()),
+					applyPossibleLiteralValue(exprDefinition.getLiteralValue(), s)));
 
 			if (stateModified.get()) {
 				return new State(newVarState, s.getFuncState());
@@ -204,9 +211,8 @@ public class InstFuncHelper {
 		};
 		return fff;
 	}
-	
-	public static Function<State, State> branchCondFunc(StateFunc branchCondDef)
-	{
+
+	public static Function<State, State> branchCondFunc(StateFunc branchCondDef) {
 		Function<State, State> fff = (State s) -> {
 			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
 			AtomicBoolean stateModified = new AtomicBoolean(false);

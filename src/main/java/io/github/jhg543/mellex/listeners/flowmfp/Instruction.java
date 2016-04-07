@@ -1,12 +1,23 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class Instruction {
-	private Object debugInfo;
 
+	private int id;
+
+	public int getId() {
+		return id;
+	}
+
+	public void setId(int id) {
+		this.id = id;
+	}
+
+	private Object debugInfo;
 	private Function<State, State> func;
 	private Collection<Supplier<Instruction>> nextPc;
 
@@ -22,10 +33,6 @@ public class Instruction {
 		return nextPc;
 	}
 
-	public void setNextPc(Collection<Supplier<Instruction>> nextPc) {
-		this.nextPc = nextPc;
-	}
-
 	public Object getDebugInfo() {
 		return debugInfo;
 	}
@@ -34,18 +41,19 @@ public class Instruction {
 		this.debugInfo = debugInfo;
 	}
 
-	public Instruction(Function<State, State> func, Object debugInfo) {
+	public Instruction(Function<State, State> func, Object debugInfo, Object scopeId) {
 		super();
 		this.func = func;
 		this.debugInfo = debugInfo;
+		this.nextPc = new ArrayList<>();
 	}
 
 	/**
 	 * shortcut for add instruction
+	 * 
 	 * @param i
 	 */
-	public void addNextInstruction(Instruction i)
-	{
-		getNextPc().add(()->i);
+	public void addNextInstruction(Instruction i) {
+		getNextPc().add(() -> i);
 	}
 }

@@ -23,9 +23,9 @@ public class ExprAnalyzeResult {
 		this.literalValue = ImmutableList.of(literalValue);
 	}
 
-	public ExprAnalyzeResult(StateFunc transformation, VariableDefinition vd) {
+	public ExprAnalyzeResult(VariableDefinition vd) {
 		super();
-		this.transformation = transformation;
+		this.transformation = StateFunc.ofValue(ValueFunc.of(vd));
 		this.literalValue = ImmutableList.of(vd);
 	}
 

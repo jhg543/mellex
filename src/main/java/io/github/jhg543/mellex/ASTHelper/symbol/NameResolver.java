@@ -52,9 +52,9 @@ public class NameResolver {
 		}
 	}
 
-	public void defineVariable(String name,VariableDefinition def)
+	public void defineVariable(VariableDefinition def)
 	{
-		local.addDefinition(name, def);
+		local.addVariableDefinition(def);
 	}
 	
 	public void defineTable(String name, TableDefinition def) {
@@ -108,11 +108,12 @@ public class NameResolver {
 		return guessEnabled;
 	}
 
-	public void metBegin(Object scopeId) {
+
+	public void startBlock(Object scopeId) {
 		local.pushScope(scopeId, true);
 	}
 
-	public void metEnd(Object scopeId) {
+	public void endBlock(Object scopeId) {
 		local.popScope(scopeId);
 	}
 
@@ -132,7 +133,7 @@ public class NameResolver {
 	}
 
 	/**
-	 * 
+	 * DOES NOT SEARCH FUNCTION/PROCEDURE
 	 * @param name
 	 * @return not found = throw exception
 	 */
@@ -149,7 +150,7 @@ public class NameResolver {
 			return (Tuple2<ObjectDefinition, StateFunc>) result;
 		}
 
-		result = local.searchByName(name);
+		result = local.searchVariable(name);
 		if (result != null) {
 			return Tuple2.of((ObjectDefinition) result, null);
 		}
@@ -176,13 +177,17 @@ public class NameResolver {
 		return null;
 	}
 
+	public Object getCurrentScopeId()
+	{
+		return local.getCurrentScopeId();
+	}
 	/**
 	 * 
 	 * @param name
 	 * @return not found = null
 	 */
 	public FunctionDefinition searchFunction(String name) {
-		ObjectDefinition result = local.searchByName(name);
+		ObjectDefinition result = local.searchFunction(name);
 		if (result != null && result instanceof FunctionDefinition) {
 			return (FunctionDefinition) result;
 		}
@@ -207,11 +212,7 @@ public class NameResolver {
 
 	public VariableDefinition searchVariable(String name)
 	{
-		ObjectDefinition result = local.searchByName(name);
-		if (result != null && result instanceof VariableDefinition) {
-			return (VariableDefinition) result;
-		}
-		return null;
+		return  local.searchVariable(name);
 	}
 
 	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {

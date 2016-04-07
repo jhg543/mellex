@@ -12,15 +12,15 @@ import com.google.common.base.Preconditions;
 
 public class FunctionDefinition extends ObjectDefinition {
 
-	private List<VariableDefinition> parameters;
+	private List<ParameterDefinition> parameters;
 
 	private StateFunc definition;
 
-	public List<VariableDefinition> getParameters() {
+	public List<ParameterDefinition> getParameters() {
 		return parameters;
 	}
 
-	public void setParameters(List<VariableDefinition> parameters) {
+	public void setParameters(List<ParameterDefinition> parameters) {
 		this.parameters = parameters;
 	}
 
@@ -34,6 +34,7 @@ public class FunctionDefinition extends ObjectDefinition {
 
 	public StateFunc apply(List<StateFunc> params) {
 		if (parameters.size() != params.size()) {
+			// TODO deal with default value
 			throw new IllegalStateException("parameter count mismatch" + parameters.size() + " " + params.size());
 		}
 
@@ -48,9 +49,9 @@ public class FunctionDefinition extends ObjectDefinition {
 
 	private static FunctionDefinition makeUnknownFunction(int parameterCount) {
 		FunctionDefinition d = new FunctionDefinition();
-		List<VariableDefinition> params = new ArrayList<>();
+		List<ParameterDefinition> params = new ArrayList<>();
 		for (int i = 0; i < parameterCount; ++i) {
-			VariableDefinition v = new VariableDefinition();
+			ParameterDefinition v = new ParameterDefinition();
 			v.setName("ARG" + i);
 			params.add(v);
 		}
