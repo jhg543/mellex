@@ -1,12 +1,13 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 
 public class PatchList {
 	
 	private Instruction startInstruction;
-	private Collection<Instruction> nextList;
+	private Collection<Instruction> nextList = new ArrayList<>();
 	public Collection<Instruction> getNextList() {
 		return nextList;
 	}
@@ -25,6 +26,11 @@ public class PatchList {
 		p.setStartInstruction(instruction);
 		p.setNextList(Collections.singletonList(instruction));
 		return p;
+	}
+	
+	public PatchList()
+	{
+		
 	}
 	
 }

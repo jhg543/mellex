@@ -1,0 +1,12 @@
+CREATE OR REPLACE FUNCTION f (x BOOLEAN, y PLS_INTEGER)
+  RETURN employees.employee_id%TYPE
+  AS
+BEGIN
+  IF x THEN
+    RETURN y;
+  ELSE
+    RETURN 2*y;
+  END IF;
+END;
+/
+ 

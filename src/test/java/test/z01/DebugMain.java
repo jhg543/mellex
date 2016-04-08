@@ -47,19 +47,18 @@ public class DebugMain {
 		tree = parser.parse();
 		PLSQLDataFlowVisitor visitor = new PLSQLDataFlowVisitor(tokens, buffer, vendor, guessEnabled);
 		visitor.visit(tree);
-
 		return buffer;
 	}
 
 	private void printInstBuffer(InstBuffer buffer) {
-		for (Instruction inst : buffer.getInstbuffer()) {
-			Object obj = inst.getDebugInfo();
-			System.out.println(obj.toString());
-			// if (obj instanceof SelectStmtData) {
-			// SelectStmtData ss = (SelectStmtData) obj;
-			// System.out.println(ss.toString());
-			// }
-		}
+//		for (Instruction inst : buffer.getInstbuffer()) {
+//			Object obj = inst.getDebugInfo();
+//			System.out.println(obj.toString());
+//			// if (obj instanceof SelectStmtData) {
+//			// SelectStmtData ss = (SelectStmtData) obj;
+//			// System.out.println(ss.toString());
+//			// }
+//		}
 	}
 
 	public DebugMain(DatabaseVendor vendor, boolean guessEnabled, String sql) {
@@ -75,7 +74,8 @@ public class DebugMain {
 
 	public static void main(String[] args) throws Exception {
 
-		DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("s001.sql"));
+		//DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("p001.sql"));
+		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, false, GetSql("p002.sql"));
 		d.run();
 	}
 }

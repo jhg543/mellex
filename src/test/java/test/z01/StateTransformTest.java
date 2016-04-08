@@ -18,6 +18,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.FilteredValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
+import io.github.jhg543.mellex.ASTHelper.plsql.ParameterDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
@@ -144,9 +145,9 @@ public class StateTransformTest {
 		// = p1 + p2; return p1+p2; }
 		ValueFunc vr0 = ValueFunc.of(r[0]);
 		FunctionDefinition fndef = new FunctionDefinition();
-		List<VariableDefinition> params = new ArrayList<VariableDefinition>();
+		List<ParameterDefinition> params = new ArrayList<ParameterDefinition>();
 		IntStream.range(0, 3).forEach(i -> {
-			params.add(new VariableDefinition());
+			params.add(new ParameterDefinition());
 			params.get(i).setName("p" + i);
 		});
 		fndef.setParameters(params);
