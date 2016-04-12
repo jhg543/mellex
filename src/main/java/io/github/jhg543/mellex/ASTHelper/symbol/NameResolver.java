@@ -64,6 +64,16 @@ public class NameResolver {
 	public void enterFunctionDefinition(Object funcid) {
 		local.pushScope(funcid, false);
 	}
+	
+	public void enterCursorDefinition(Object scopeId)
+	{
+		local.pushScope(scopeId, true);
+	}
+	
+
+	public void exitCursorDefinition(Object scopeId) {
+		local.popScope(scopeId);
+	}
 
 	public void enterResultColumn(String alias) {
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
@@ -142,7 +152,7 @@ public class NameResolver {
 
 		result = pse.searchByName(name);
 		if (result != null) {
-			return Tuple2.of(null, null);
+			return Tuple2.of(null, (StateFunc)result);
 		}
 
 		result = alias.searchByName(name);

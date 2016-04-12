@@ -41,4 +41,11 @@ public class ExprAnalyzeResult {
 		this.transformation = transformation;
 		this.literalValue = Collections.emptyList();
 	}
+
+	@Override
+	public String toString() {
+		return "E [v=" + literalValue + ", t=" + transformation + "]";
+	}
+	
+	
 }

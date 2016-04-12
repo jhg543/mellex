@@ -12,8 +12,7 @@ public class SelectStmtData {
 	protected List<ResultColumn> columns;
 	protected Map<String, Integer> nameIndexMap; // index is 0 based
 	protected List<VariableDefinition> intos;
-	
-	
+
 	public List<VariableDefinition> getIntos() {
 		return intos;
 	}
@@ -24,6 +23,7 @@ public class SelectStmtData {
 
 	/**
 	 * do not modify it.
+	 * 
 	 * @return
 	 */
 	public List<ResultColumn> getColumns() {
@@ -42,9 +42,10 @@ public class SelectStmtData {
 	public StateFunc getColumnExprFunc(String name) {
 		return getColumnExprFunc(nameIndexMap.get(name));
 	}
-	
+
 	/**
 	 * do not modify the result collection
+	 * 
 	 * @return
 	 */
 	public Map<String, Integer> getNameIndexMap() {
@@ -75,14 +76,13 @@ public class SelectStmtData {
 	@Override
 	public String toString() {
 		String s = "SelectStmt [";
-		for (ResultColumn rc:columns)
-		{
-			s+="\t";
-			s+=rc.getName();
-			s+=" = ";
-			s+=rc.getExpr();
+		for (ResultColumn rc : columns) {
+			s += "\t";
+			s += rc.getName();
+			s += " = ";
+			s += rc.getExpr();
 		}
-		s+="]";		
+		s += "]";
 		return s;
 	}
 

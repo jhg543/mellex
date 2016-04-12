@@ -32,7 +32,7 @@ public class FunctionDefinition extends ObjectDefinition {
 		this.definition = definition;
 	}
 
-	public StateFunc apply(List<StateFunc> params) {
+	public StateFunc applyDefinition(List<StateFunc> params) {
 		if (parameters.size() != params.size()) {
 			// TODO deal with default value
 			throw new IllegalStateException("parameter count mismatch" + parameters.size() + " " + params.size());

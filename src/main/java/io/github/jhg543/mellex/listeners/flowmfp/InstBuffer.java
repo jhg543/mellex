@@ -32,7 +32,8 @@ public class InstBuffer {
 		finishedFunction.add(fb);
 		PrintWriter w = new PrintWriter(System.out);
 		printFunctionInst(fb, w);
-		w.close();
+		
+		w.flush();
 		// TODO this is a debug..
 
 	}

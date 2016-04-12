@@ -1,14 +1,24 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 
 public class PseudoColumnResolver {
+	//TODO implement this.
+	
+	private Map<String,StateFunc> globalcs;
+	
 	public PseudoColumnResolver(DatabaseVendor vendor)
 	{
-		
+		globalcs= new HashMap<>();
+		globalcs.put("TRUE", StateFunc.of());
+		globalcs.put("FALSE", StateFunc.of());
 	}
-	public Object searchByName(String name)
+	public StateFunc searchByName(String name)
 	{
-		return null;
+		return globalcs.get(name);
 	}
 }

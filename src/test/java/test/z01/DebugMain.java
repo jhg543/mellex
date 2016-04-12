@@ -75,7 +75,7 @@ public class DebugMain {
 	public static void main(String[] args) throws Exception {
 
 		//DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("p001.sql"));
-		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, false, GetSql("p002.sql"));
+		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, false, GetSql("p004.sql"));
 		d.run();
 	}
 }

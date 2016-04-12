@@ -38,8 +38,8 @@ public class LocalObjectResolver {
 				// function does not have columns
 				return null;
 			}
-			throw new RuntimeException("TODO DEBUG MARKER variable.column" + name);
-			//return ((VariableDefinition)d).getColumn(namedotsplit.get(1)); 
+			//throw new RuntimeException("TODO DEBUG MARKER variable.column" + name);
+			return ((VariableDefinition)d).getColumn(namedotsplit.get(1)); 
 
 		} else {
 			// size>2, leave to global
@@ -106,6 +106,7 @@ public class LocalObjectResolver {
 		boolean parentScopeVisible;
 		Map<String, VariableDefinition> variables;
 		Map<String, FunctionDefinition> functions;
+		
 
 		public Object getId() {
 			return id;

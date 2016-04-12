@@ -164,7 +164,7 @@ public class StateTransformTest {
 		StateFunc cc1 = StateFunc.ofValue(ValueFunc.of(v[0], v[1]));
 		StateFunc cc2 = StateFunc.ofValue(ValueFunc.of(v[2]));
 		StateFunc cc3 = StateFunc.ofValue(ValueFunc.of(v[3], v[4], v[5]));
-		StateFunc answer = fndef.apply(Arrays.asList(cc1, cc2, cc3));
+		StateFunc answer = fndef.applyDefinition(Arrays.asList(cc1, cc2, cc3));
 		// System.out.println(answer);
 
 		MutableSD expectedResult = MutableSD.create();
