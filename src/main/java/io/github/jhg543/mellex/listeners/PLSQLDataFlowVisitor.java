@@ -85,6 +85,7 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Multiple_plsql_stmt
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Non_subquery_select_stmtContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Null_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Object_nameContext;
+import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Open_statementContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Order_by_clauseContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Ordering_term_windowContext;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.Parameter_declarationContext;
@@ -967,6 +968,21 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	}
 
 	@Override
+	public Object visitOpen_statement(Open_statementContext ctx) {
+		ExprContext expr = ctx.expr();
+		if (expr instanceof ExprObjectContext)
+		{
+			// no args
+		}
+		else
+		{
+			// args present
+		}
+		return null;
+		
+	}
+
+	@Override
 	public PatchList visitMultiple_plsql_stmt_list(Multiple_plsql_stmt_listContext ctx) {
 		PatchList patchList = new PatchList();
 		PatchList prevpl = null;
@@ -1254,7 +1270,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	}
 
-
 	@Override
 	public List<PatchList> visitDeclare_section(Declare_sectionContext ctx) {
 		List<PatchList> initSeqs = new ArrayList<>();
@@ -1312,13 +1327,31 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitCursor_definition(Cursor_definitionContext ctx) {
+		CursorDefinition def = new CursorDefinition();
+		def.setName(ctx.any_name().getText());
 		nameResolver.enterCursorDefinition(ctx);
+		if (ctx.parameter_declarations() != null) {
+			List<ParameterDefinition> parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations()
+					.accept(this);
+			parameterDefinitions.forEach(nameResolver::defineVariable);
+			def.setParameters(parameterDefinitions);
+		} else {
+			def.setParameters(Collections.emptyList());
+		}
+		
+		if (ctx.select_stmt()!=null)
+		{
+			SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
+			def.setSelectStmt(ss);
+		}
+		
 		
 		nameResolver.exitCursorDefinition(ctx);
+		
+		nameResolver.defineCursor(def);
 		return null;
 	}
-	
-	
+
 	@Override
 	public PatchList visitVariable_declaration(Variable_declarationContext ctx) {
 		// COPY FROM visitParameter_declaration
@@ -1338,8 +1371,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		}
 	}
 
-	
-	
 	@Override
 	public PatchList visitBody(BodyContext ctx) {
 		return (PatchList) ctx.multiple_plsql_stmt_list().accept(this);

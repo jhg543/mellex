@@ -118,6 +118,10 @@ public class LocalObjectResolver {
 		Preconditions.checkState(this.scopes.peek().getVariables().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
 	}
 
+	public void addCursorDefinition( CursorDefinition def) {
+		Preconditions.checkState(this.scopes.peek().getCursors().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
+	}
+	
 	private static class Scope {
 		Object id;
 		boolean parentScopeVisible;

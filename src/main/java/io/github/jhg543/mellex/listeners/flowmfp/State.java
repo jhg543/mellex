@@ -26,6 +26,8 @@ public class State {
 	private boolean locked = false;
 
 	private Map<VariableDefinition, VariableState> varState;
+	
+	//	TODO cursor may have Multiple state e.g if (x) cursor = selectStmt 1 else cursor = selectstmt2
 	private Map<CursorDefinition, SelectStmtData> cursorState;
 	
 	private FunctionStateRecorder funcState;

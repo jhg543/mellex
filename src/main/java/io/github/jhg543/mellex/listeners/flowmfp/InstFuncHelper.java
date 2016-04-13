@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ExprAnalyzeResult;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ResultColumn;
@@ -193,4 +194,45 @@ public class InstFuncHelper {
 
 		return fff;
 	}
+	
+
+	public static Function<State, State> OpenCursorFunc(CursorDefinition def, List<VariableDefinition> parameters,SelectStmtData ss,VariableDefinition dynamicSQL ) {
+
+		Function<State, State> fff = (State s) -> {
+			State ns = s.copy();
+
+			List<VariableDefinition> intos = null;
+			// INTO CLAUSE
+			if (ss.getIntos() != null) {
+				intos = ss.getIntos();
+				if (ss.getColumns().size() == intos.size()) {
+					// do nothing
+					// TODO what if variable is record with 1 column.
+				} else {
+					if (intos.size() > 1) {
+						throw new IllegalStateException(
+								String.format("intos %s count mismatch %s", intos, ss.getNameIndexMap()));
+					}
+					// TODO analyze record structure
+					VariableDefinition recdef = intos.get(0);
+					intos = new ArrayList<>();
+					for (ResultColumn rc : ss.getColumns()) {
+						intos.add(recdef.getColumn(rc.getName()));
+					}
+					// a record
+				}
+			}
+
+			for (int i = 0; i < ss.getColumns().size(); ++i) {
+				StateFunc fn = applyState(ss.getColumnExprFunc(i), s);
+				metFn(fn, ns);
+				if (intos != null) {
+					ns.writeOneVariable(intos.get(i), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
+				}
+			}
+
+			return ns;
+		};
+		return fff;
+	}	
 }

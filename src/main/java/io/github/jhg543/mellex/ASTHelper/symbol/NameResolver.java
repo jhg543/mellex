@@ -58,6 +58,10 @@ public class NameResolver {
 		local.addVariableDefinition(def);
 	}
 
+	public void defineCursor(CursorDefinition def) {
+		local.addCursorDefinition(def);
+	}
+
 	public void defineTable(String name, TableDefinition def) {
 		tableStorage.putTable(name, def);
 	}
