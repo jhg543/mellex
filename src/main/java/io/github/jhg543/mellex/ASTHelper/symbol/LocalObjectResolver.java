@@ -11,6 +11,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 
 import io.github.jhg543.mellex.ASTHelper.plsql.ControlBlock;
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
@@ -46,6 +47,21 @@ public class LocalObjectResolver {
 			return null;
 		}
 
+	}
+	
+	public CursorDefinition searchCursor(String name)
+	{
+		for (Scope s : scopes) {
+			Map<String, CursorDefinition> m = s.getCursors();
+			CursorDefinition d = m.get(name);
+			if (d != null) {
+				return d;
+			}
+			if (!s.isParentScopeVisible()) {
+				return null;
+			}
+		}
+		return null;		
 	}
 
 	private VariableDefinition searchVariableBySimpleName(String name) {
@@ -85,6 +101,7 @@ public class LocalObjectResolver {
 		s.setParentScopeVisible(parentScopeVisible);
 		s.setFunctions(new HashMap<>());
 		s.setVariables(new HashMap<>());
+		s.setCursors(new HashMap<>());
 		this.scopes.push(s);
 	}
 	
@@ -106,6 +123,7 @@ public class LocalObjectResolver {
 		boolean parentScopeVisible;
 		Map<String, VariableDefinition> variables;
 		Map<String, FunctionDefinition> functions;
+		Map<String, CursorDefinition> cursors;
 		
 
 		public Object getId() {
@@ -138,6 +156,14 @@ public class LocalObjectResolver {
 
 		public void setFunctions(Map<String, FunctionDefinition> functions) {
 			this.functions = functions;
+		}
+
+		public Map<String, CursorDefinition> getCursors() {
+			return cursors;
+		}
+
+		public void setCursors(Map<String, CursorDefinition> cursors) {
+			this.cursors = cursors;
 		}
 
 

@@ -39,7 +39,6 @@ import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.VariableModification;
 import io.github.jhg543.mellex.ASTHelper.symbol.NameResolver;
 import io.github.jhg543.mellex.ASTHelper.symbol.TableStorage;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
@@ -1313,8 +1312,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
 	@Override
 	public Object visitCursor_definition(Cursor_definitionContext ctx) {
-		throw new UnsupportedOperationException("not implemented");
-		// TODO INPLEMENT
+		nameResolver.enterCursorDefinition(ctx);
+		
+		nameResolver.exitCursorDefinition(ctx);
+		return null;
 	}
 	
 	

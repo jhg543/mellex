@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
@@ -29,7 +30,7 @@ public class NameResolver {
 		this.vendor = vendor;
 		this.tableStorage = tableStorage;
 		this.guessEnabled = guessEnabled;
-		this.alias = new AliasColumnResolver(vendor.equals(DatabaseVendor.ORACLE), tableStorage,guessEnabled);
+		this.alias = new AliasColumnResolver(vendor.equals(DatabaseVendor.ORACLE), tableStorage, guessEnabled);
 		this.local = new LocalObjectResolver();
 		this.global = new GlobalObjectResolver(true, tableStorage::getTable);
 		this.pse = new PseudoColumnResolver(vendor);
@@ -46,17 +47,17 @@ public class NameResolver {
 	public void addFromTable(String tableName, String alias) {
 		this.alias.addFromTable(tableName, alias);
 	}
+
 	public void collectResultColumnAlias(List<String> aliasList) {
 		if (vendor.equals(DatabaseVendor.TERADATA)) {
 			ors.collectResultColumnAlias(aliasList);
 		}
 	}
 
-	public void defineVariable(VariableDefinition def)
-	{
+	public void defineVariable(VariableDefinition def) {
 		local.addVariableDefinition(def);
 	}
-	
+
 	public void defineTable(String name, TableDefinition def) {
 		tableStorage.putTable(name, def);
 	}
@@ -64,12 +65,10 @@ public class NameResolver {
 	public void enterFunctionDefinition(Object funcid) {
 		local.pushScope(funcid, false);
 	}
-	
-	public void enterCursorDefinition(Object scopeId)
-	{
+
+	public void enterCursorDefinition(Object scopeId) {
 		local.pushScope(scopeId, true);
 	}
-	
 
 	public void exitCursorDefinition(Object scopeId) {
 		local.popScope(scopeId);
@@ -109,15 +108,12 @@ public class NameResolver {
 	 */
 	public TableDefinition getAliasTableDefinition(String alias) {
 		return (TableDefinition) this.alias.searchSubqueryOrCteOrLiveTable(alias);
-		
+
 	}
-	
-	
 
 	public boolean isGuessEnabled() {
 		return guessEnabled;
 	}
-
 
 	public void startBlock(Object scopeId) {
 		local.pushScope(scopeId, true);
@@ -144,6 +140,7 @@ public class NameResolver {
 
 	/**
 	 * DOES NOT SEARCH FUNCTION/PROCEDURE
+	 * 
 	 * @param name
 	 * @return not found = throw exception
 	 */
@@ -152,7 +149,7 @@ public class NameResolver {
 
 		result = pse.searchByName(name);
 		if (result != null) {
-			return Tuple2.of(null, (StateFunc)result);
+			return Tuple2.of(null, (StateFunc) result);
 		}
 
 		result = alias.searchByName(name);
@@ -187,10 +184,10 @@ public class NameResolver {
 		return null;
 	}
 
-	public Object getCurrentScopeId()
-	{
+	public Object getCurrentScopeId() {
 		return local.getCurrentScopeId();
 	}
+
 	/**
 	 * 
 	 * @param name
@@ -220,9 +217,12 @@ public class NameResolver {
 		return tableStorage.getTable(name);
 	}
 
-	public VariableDefinition searchVariable(String name)
-	{
-		return  local.searchVariable(name);
+	public VariableDefinition searchVariable(String name) {
+		return local.searchVariable(name);
+	}
+
+	public CursorDefinition searchCursor(String name) {
+		return local.searchCursor(name);
 	}
 
 	public List<Tuple2<String, StateFunc>> searchWildcardAll(String fileName, int lineNumber, int charPosition) {

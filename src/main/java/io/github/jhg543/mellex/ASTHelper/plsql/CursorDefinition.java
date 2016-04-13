@@ -6,20 +6,23 @@ import java.util.List;
 
 public class CursorDefinition extends ObjectDefinition {
 
-	private List<VariableDefinition> parameters;
-	private SubQuery selectInf;
+	private List<ParameterDefinition> parameters;
 	
-	public List<VariableDefinition> getParameters() {
+	public List<ParameterDefinition> getParameters() {
 		return parameters;
 	}
-	public void setParameters(List<VariableDefinition> parameters) {
+	public void setParameters(List<ParameterDefinition> parameters) {
 		this.parameters = parameters;
 	}
 
-	public SubQuery getSelectInf() {
-		return selectInf;
+	private SelectStmtData selectStmt;
+
+	public SelectStmtData getSelectStmt() {
+		return selectStmt;
 	}
-	public void setSelectInf(SubQuery selectInf) {
-		this.selectInf = selectInf;
+	public void setSelectStmt(SelectStmtData selectStmt) {
+		this.selectStmt = selectStmt;
 	}
+	
+	
 }

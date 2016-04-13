@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 
 public class State {
@@ -24,12 +26,19 @@ public class State {
 	private boolean locked = false;
 
 	private Map<VariableDefinition, VariableState> varState;
+	private Map<CursorDefinition, SelectStmtData> cursorState;
+	
 	private FunctionStateRecorder funcState;
 
 	public Map<VariableDefinition, VariableState> readVarState() {
 		return Collections.unmodifiableMap(varState);
 	}
 
+	public Map<CursorDefinition, SelectStmtData> readCursorState()
+	{
+		return Collections.unmodifiableMap(cursorState);
+	}
+	
 	public VariableState writeOneVariable(VariableDefinition def, VariableState s) {
 		if (locked) {
 			throw new RuntimeException("COW violated");
