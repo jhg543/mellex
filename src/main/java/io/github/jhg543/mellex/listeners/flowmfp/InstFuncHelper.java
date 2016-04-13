@@ -23,8 +23,9 @@ import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 public class InstFuncHelper {
 
 	private static StateFunc applyState(StateFunc fn, State s) {
+		// TODO what if varstate has R?
 		Map<ObjectDefinition, ValueFunc> params = new HashMap<>();
-		s.getVarState().forEach((k, v) -> params.put(k, v.getValueInfluence()));
+		s.readVarState().forEach((k, v) -> params.put(k, v.getValueInfluence()));
 		return fn.applyState(params);
 	}
 
@@ -35,7 +36,7 @@ public class InstFuncHelper {
 			if (o instanceof String) {
 				result.add(o);
 			} else if (o instanceof VariableDefinition) {
-				VariableState v = s.getVarState().get(o);
+				VariableState v = s.readVarState().get(o);
 				if (v == null) {
 					throw new IllegalStateException(o.toString() + " not found in state");
 				}
@@ -58,25 +59,16 @@ public class InstFuncHelper {
 		}
 	}
 
-	private static StateFunc metInsertColumn(ColumnDefinition cdef, StateFunc fn, State s,
-			Map<VariableDefinition, VariableState> newVarState, AtomicBoolean stateModified) {
+	private static StateFunc metInsertColumn(ColumnDefinition cdef, StateFunc fn, State newState) {
 
-		s.getFuncState().addInsertOrUpdate(cdef, fn);
+		newState.getFuncState().addInsertOrUpdate(cdef, fn);
+		// this means variable value should not change and used
+		// during one instruction
+		// TODO check k is VariableDefinition
+		fn.getAssigns().forEach((k, v) -> {
+			newState.writeOneVariable((VariableDefinition) k, new VariableState(v, null));
+		});
 
-		if (!fn.getAssigns().isEmpty()) {
-			if (!stateModified.get()) {
-				newVarState.putAll(s.getVarState());
-				stateModified.set(true);
-				;
-			}
-
-			// this means variable value should not change and used
-			// during one instruction
-			// TODO check k is VariableDefinition
-			fn.getAssigns().forEach((k, v) -> {
-				newVarState.put((VariableDefinition) k, new VariableState(v, null));
-			});
-		}
 		return fn;
 	}
 
@@ -89,24 +81,18 @@ public class InstFuncHelper {
 	 * @param stateModified
 	 * @return
 	 */
-	private static StateFunc metFn(StateFunc fn, State s, Map<VariableDefinition, VariableState> newVarState,
-			AtomicBoolean stateModified) {
-		return metInsertColumn(null, fn, s, newVarState, stateModified);
+	private static StateFunc metFn(StateFunc fn, State newState) {
+		return metInsertColumn(null, fn, newState);
 	}
 
 	public static Function<State, State> callExpression(StateFunc exprDefinition) {
 		Function<State, State> fff = (State s) -> {
-			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
-			AtomicBoolean stateModified = new AtomicBoolean(false);
+			State ns = s.copy();
 
 			StateFunc fn = applyState(exprDefinition, s);
-			metFn(fn, s, newVarState, stateModified);
+			metFn(fn, ns);
 
-			if (stateModified.get()) {
-				return new State(newVarState, s.getFuncState());
-			} else {
-				return s;
-			}
+			return ns;
 
 		};
 
@@ -115,22 +101,17 @@ public class InstFuncHelper {
 
 	public static Function<State, State> assignExpression(VariableDefinition lvalue, ExprAnalyzeResult exprDefinition) {
 		Function<State, State> fff = (State s) -> {
-			Map<VariableDefinition, VariableState> newVarState = new HashMap<>(s.getVarState());
-			AtomicBoolean stateModified = new AtomicBoolean(true);
+			State ns = s.copy();
 
 			StateFunc fn = applyState(exprDefinition.getTransformation(), s);
-			metFn(fn, s, newVarState, stateModified);
+			metFn(fn, ns);
 
 			// TODO possible literal
 
-			newVarState.put(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()),
+			ns.writeOneVariable(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()),
 					applyPossibleLiteralValue(exprDefinition.getLiteralValue(), s)));
 
-			if (stateModified.get()) {
-				return new State(newVarState, s.getFuncState());
-			} else {
-				return s;
-			}
+			return ns;
 
 		};
 
@@ -141,20 +122,15 @@ public class InstFuncHelper {
 
 		Preconditions.checkArgument(cdefs.size() == subs.size(), "cdef & expr size mismatch %s %s", cdefs.size(), subs.size());
 		Function<State, State> fff = (State s) -> {
-			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
-			AtomicBoolean stateModified = new AtomicBoolean(false);
+			State ns = s.copy();
 
 			List<StateFunc> stateMods = subs.stream().map(fn -> applyState(fn, s)).collect(Collectors.toList());
 			for (int i = 0; i < cdefs.size(); ++i) {
 				StateFunc fn = stateMods.get(i);
-				metInsertColumn(cdefs.get(i), fn, s, newVarState, stateModified);
+				metInsertColumn(cdefs.get(i), fn, ns);
 			}
 
-			if (stateModified.get()) {
-				return new State(newVarState, s.getFuncState());
-			} else {
-				return s;
-			}
+			return ns;
 		};
 		return fff;
 	}
@@ -166,16 +142,11 @@ public class InstFuncHelper {
 	public static Function<State, State> SelectFunc(SelectStmtData ss) {
 
 		Function<State, State> fff = (State s) -> {
-			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
-			AtomicBoolean stateModified = new AtomicBoolean(false);
+			State ns = s.copy();
 
 			List<VariableDefinition> intos = null;
 			// INTO CLAUSE
 			if (ss.getIntos() != null) {
-				if (!stateModified.get()) {
-					newVarState.putAll(s.getVarState());
-					stateModified.set(true);
-				}
 				intos = ss.getIntos();
 				if (ss.getColumns().size() == intos.size()) {
 					// do nothing
@@ -197,35 +168,26 @@ public class InstFuncHelper {
 
 			for (int i = 0; i < ss.getColumns().size(); ++i) {
 				StateFunc fn = applyState(ss.getColumnExprFunc(i), s);
-				metFn(fn, s, newVarState, stateModified);
+				metFn(fn, ns);
 				if (intos != null) {
-					newVarState.put(intos.get(i), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
+					ns.writeOneVariable(intos.get(i), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
 				}
 			}
 
-			if (stateModified.get()) {
-				return new State(newVarState, s.getFuncState());
-			} else {
-				return s;
-			}
+			return ns;
 		};
 		return fff;
 	}
 
 	public static Function<State, State> branchCondFunc(StateFunc branchCondDef) {
 		Function<State, State> fff = (State s) -> {
-			Map<VariableDefinition, VariableState> newVarState = new HashMap<>();
-			AtomicBoolean stateModified = new AtomicBoolean(false);
+			State ns = s.copy();
 
 			StateFunc fn = applyState(branchCondDef, s);
-			metFn(fn, s, newVarState, stateModified);
-			s.getFuncState().addBranch(fn);
+			metFn(fn, ns);
+			ns.getFuncState().addBranch(fn);
 
-			if (stateModified.get()) {
-				return new State(newVarState, s.getFuncState());
-			} else {
-				return s;
-			}
+			return ns;
 
 		};
 

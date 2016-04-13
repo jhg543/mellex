@@ -34,7 +34,6 @@ import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
 import io.github.jhg543.mellex.ASTHelper.plsql.ParameterDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ResultColumn;
-import io.github.jhg543.mellex.ASTHelper.plsql.ScopeStack;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
@@ -164,7 +163,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 	private boolean metaGuessEnabled = true;
 	private boolean debugPlsql = true;
 	private LabelRecorder labelRecorder;
-	private ScopeStack scopeStack;
 
 	public PLSQLDataFlowVisitor(TokenStream stream, InstBuffer instbuffer, DatabaseVendor vendor, boolean metaGuessEnabled) {
 		super();
