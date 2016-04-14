@@ -1,12 +1,11 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
+import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
-import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
 
 public class State {
 	public State copy() {
@@ -28,7 +27,7 @@ public class State {
 	private Map<VariableDefinition, VariableState> varState;
 	
 	//	TODO cursor may have Multiple state e.g if (x) cursor = selectStmt 1 else cursor = selectstmt2
-	private Map<CursorDefinition, SelectStmtData> cursorState;
+	private Map<CursorDefinition, CursorState> cursorState;
 	
 	private FunctionStateRecorder funcState;
 
@@ -36,7 +35,7 @@ public class State {
 		return Collections.unmodifiableMap(varState);
 	}
 
-	public Map<CursorDefinition, SelectStmtData> readCursorState()
+	public Map<CursorDefinition, CursorState> readCursorState()
 	{
 		return Collections.unmodifiableMap(cursorState);
 	}
