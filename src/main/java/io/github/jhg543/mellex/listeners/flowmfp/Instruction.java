@@ -7,53 +7,57 @@ import java.util.function.Supplier;
 
 public class Instruction {
 
-	private int id;
+    private int id;
+    private Object debugInfo;
+    private Object scopeId;
+    private Function<State, State> func;
+    private Collection<Supplier<Instruction>> nextPc;
+    public Instruction(Function<State, State> func, Object debugInfo, Object scopeId) {
+        super();
+        this.func = func;
+        this.debugInfo = debugInfo;
+        this.scopeId = scopeId;
+        this.nextPc = new ArrayList<>();
+    }
 
-	public int getId() {
-		return id;
-	}
+    public Object getScopeId() {
+        return scopeId;
+    }
 
-	public void setId(int id) {
-		this.id = id;
-	}
+    public int getId() {
+        return id;
+    }
 
-	private Object debugInfo;
-	private Function<State, State> func;
-	private Collection<Supplier<Instruction>> nextPc;
+    public void setId(int id) {
+        this.id = id;
+    }
 
-	public Function<State, State> getFunc() {
-		return func;
-	}
+    public Function<State, State> getFunc() {
+        return func;
+    }
 
-	public void setFunc(Function<State, State> func) {
-		this.func = func;
-	}
+    public void setFunc(Function<State, State> func) {
+        this.func = func;
+    }
 
-	public Collection<Supplier<Instruction>> getNextPc() {
-		return nextPc;
-	}
+    public Collection<Supplier<Instruction>> getNextPc() {
+        return nextPc;
+    }
 
-	public Object getDebugInfo() {
-		return debugInfo;
-	}
+    public Object getDebugInfo() {
+        return debugInfo;
+    }
 
-	public void setDebugInfo(Object debugInfo) {
-		this.debugInfo = debugInfo;
-	}
+    public void setDebugInfo(Object debugInfo) {
+        this.debugInfo = debugInfo;
+    }
 
-	public Instruction(Function<State, State> func, Object debugInfo, Object scopeId) {
-		super();
-		this.func = func;
-		this.debugInfo = debugInfo;
-		this.nextPc = new ArrayList<>();
-	}
-
-	/**
-	 * shortcut for add instruction
-	 * 
-	 * @param i
-	 */
-	public void addNextInstruction(Instruction i) {
-		getNextPc().add(() -> i);
-	}
+    /**
+     * shortcut for add instruction
+     *
+     * @param i
+     */
+    public void addNextInstruction(Instruction i) {
+        getNextPc().add(() -> i);
+    }
 }

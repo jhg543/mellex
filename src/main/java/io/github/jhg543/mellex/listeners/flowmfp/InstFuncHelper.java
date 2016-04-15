@@ -123,11 +123,10 @@ public class InstFuncHelper {
         return Function.identity();
     }
 
-    public static Function<State, State> SelectFunc(SelectStmtData ss) {
+    public static Function<State, State> selectFunc(SelectStmtData ss) {
 
         Function<State, State> fff = (State s) -> {
             State ns = s.copy();
-
             List<VariableDefinition> intos = null;
             // INTO CLAUSE
             if (ss.getIntos() != null) {
@@ -166,34 +165,58 @@ public class InstFuncHelper {
     public static Function<State, State> branchCondFunc(StateFunc branchCondDef) {
         Function<State, State> fff = (State s) -> {
             State ns = s.copy();
-
             StateFunc fn = applyState(branchCondDef, s);
             metFn(fn, ns);
             ns.getFuncState().addBranch(fn);
-
             return ns;
-
         };
-
         return fff;
     }
 
 
-    public static Function<State, State> OpenCursorFuncStatic(CursorDefinition def, SelectStmtData ss) {
+    public static Function<State, State> openCursorFuncStatic(CursorDefinition cursorDefinition, SelectStmtData ss) {
 
         // (1) apply parameter value (Done in visitOpenCursor)
         // (2) apply state
         /* for example DECLARE n1 number, n2 number, n3 number,cursor c1(sal number) is select n1*columnA-sal from t1
         begin open c1(n2+n3)
          */
+
+        // it's very similar to "select into"
         Function<State, State> fff = (State s) -> {
             State ns = s.copy();
-
-            // SelectStmtData appliedss = new SelectStmtData();
-
-            for (int i = 0; i < ss.getColumns().size(); ++i) {
-                StateFunc fn = applyState(ss.getColumnExprFunc(i), s);
+            CursorState.Builder csbuilder = new CursorState.Builder();
+            for (ResultColumn rc : ss.getColumns()) {
+                StateFunc fn = applyState(rc.getExpr(), s);
                 metFn(fn, ns);
+                csbuilder.put(rc.getName(), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
+            }
+            ns.writeOneCursorState(cursorDefinition, csbuilder.build());
+            return ns;
+        };
+        return fff;
+    }
+
+    public static Function<State, State> fetchCursorFunc(CursorDefinition cursorDefinition, List<VariableDefinition> intos) {
+
+        // fetch c into a1,a2,a3
+        // fetch c into record1
+        // TODO c is 1 column and record1 is not scalar
+        Function<State, State> fff = (State s) -> {
+            State ns = s.copy();
+            CursorState cs = s.readCursorState().get(cursorDefinition);
+            if (intos.size() >= 1 && intos.size() != cs.getColumns().size()) {
+                throw new IllegalStateException(String.format("Fetch into size mismatch %d %d", intos.size(), cs.getColumns().size()));
+            }
+
+            if (intos.size() == cs.getColumns().size()) {
+                // into multiple variables
+                for (int i = 0; i < cs.getColumns().size(); ++i) {
+                    ns.writeOneVariable(intos.get(i), cs.getColumns().get(i));
+                }
+            } else {
+                // into a record
+                cs.getNameIndexMap().forEach((name, index) -> ns.writeOneVariable(intos.get(0).getColumn(name), cs.getColumns().get(index)));
             }
 
             return ns;

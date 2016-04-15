@@ -448,7 +448,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     @Override
     public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
         SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
-        return instbuffer.add(new Instruction(InstFuncHelper.SelectFunc(ss),
+        return instbuffer.add(new Instruction(InstFuncHelper.selectFunc(ss),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), ss), nameResolver.getCurrentScopeId()));
 
     }
@@ -462,7 +462,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
     @Override
     public Tuple2<List<StateFunc>, List<Integer>> visitOrder_by_clause(Order_by_clauseContext ctx) {
-        List<StateFunc> exprs = ctx.ex.stream().map(PLSQLDataFlowVisitor::funcOfExpr).collect(Collectors.toList());
+        List<StateFunc> exprs = ctx.ex.stream().map(exprContext -> funcOfExpr(exprContext.accept(PLSQLDataFlowVisitor.this))).collect(Collectors.toList());
         List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
         return Tuple2.of(exprs, indexes);
     }
@@ -1092,7 +1092,10 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         FunctionDefinition functionDefinition = new FunctionDefinition();
         functionDefinition.setName(ctx.object_name().getText());
-        List<ParameterDefinition> parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations().accept(this);
+        List<ParameterDefinition> parameterDefinitions = Collections.emptyList();
+        if (ctx.parameter_declarations()!=null) {
+            parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations().accept(this);
+        }
         functionDefinition.setParameters(parameterDefinitions);
         nameResolver.enterFunctionDefinition(ctx);
         instbuffer.enterFunctionDef(functionDefinition);
@@ -1247,7 +1250,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 } else {
                     ss = cursorDefinition.getSelectStmt();
                 }
-                return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncStatic(cursorDefinition, ss),
+                return instbuffer.add(new Instruction(InstFuncHelper.openCursorFuncStatic(cursorDefinition, ss),
                         CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, ss),
                         nameResolver.getCurrentScopeId()));
             }
@@ -1273,13 +1276,31 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
             SelectStmtData appliedStmt = new SelectStmtData(newrs);
 
-
-            return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncStatic(cursorDefinition, appliedStmt),
+            return instbuffer.add(new Instruction(InstFuncHelper.openCursorFuncStatic(cursorDefinition, appliedStmt),
                     CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, appliedStmt),
                     nameResolver.getCurrentScopeId()));
         }
 
+    }
 
+    @Override
+    public PatchList visitFetch_statement(Fetch_statementContext ctx) {
+        CursorDefinition cursorDefinition = nameResolver.searchCursor(ctx.cursor.getText());
+        List<VariableDefinition> intos = new ArrayList<>();
+        for (Object_nameContext objctx:ctx.vars)
+        {
+            intos.add(nameResolver.searchVariable(objctx.getText()));
+        }
+        return instbuffer.add(new Instruction(InstFuncHelper.fetchCursorFunc(cursorDefinition, intos),
+                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, intos),
+                nameResolver.getCurrentScopeId()));
+
+    }
+
+    @Override
+    public ExprAnalyzeResult visitExprCursorAttribute(ExprCursorAttributeContext ctx) {
+        //TODO can cursor check be ignored?
+        return new ExprAnalyzeResult(StateFunc.of());
     }
 
     @Override

@@ -278,7 +278,8 @@ exit_statement :
     ;
 
 fetch_statement :
-        K_FETCH qual_id ( into_clause | bulk_collect_into_clause ( K_LIMIT expr )? )
+//        K_FETCH qual_id ( into_clause | bulk_collect_into_clause ( K_LIMIT expr )? )
+        K_FETCH cursor=object_name (K_BULK K_COLLECT)? K_INTO vars+=object_name (',' vars+=object_name )* ( K_LIMIT expr )?
     ;
 
 into_clause :

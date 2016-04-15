@@ -8,58 +8,69 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class State {
-	public State copy() {
-		this.locked = true;
-		State s = new State(varState, funcState);
-		return s;
-	}
+    public State copy() {
+        this.locked = true;
+        State s = new State(variableStateMap, cursorStateMap, funcState);
+        return s;
+    }
 
-	/**
-	 * mark
-	 */
-	private boolean varStateCopied = false;
+    /**
+     * mark
+     */
+    private boolean varStateCopied = false;
+    private boolean cursorStateCopied = false;
 
-	/**
-	 * copy on write so no write after being copied.
-	 */
-	private boolean locked = false;
+    /**
+     * copy on write so no write after being copied.
+     */
+    private boolean locked = false;
 
-	private Map<VariableDefinition, VariableState> varState;
-	
-	//	TODO cursor may have Multiple state e.g if (x) cursor = selectStmt 1 else cursor = selectstmt2
-	private Map<CursorDefinition, CursorState> cursorState;
-	
-	private FunctionStateRecorder funcState;
+    private Map<VariableDefinition, VariableState> variableStateMap;
 
-	public Map<VariableDefinition, VariableState> readVarState() {
-		return Collections.unmodifiableMap(varState);
-	}
+    //	TODO cursor may have Multiple state e.g if (x) cursor = selectStmt 1 else cursor = selectstmt2
+    private Map<CursorDefinition, CursorState> cursorStateMap;
 
-	public Map<CursorDefinition, CursorState> readCursorState()
-	{
-		return Collections.unmodifiableMap(cursorState);
-	}
-	
-	public VariableState writeOneVariable(VariableDefinition def, VariableState s) {
-		if (locked) {
-			throw new RuntimeException("COW violated");
-		}
-		if (!varStateCopied) {
-			varStateCopied = true;
-			varState = new HashMap<>(varState);
-		}
-		return varState.put(def, s);
+    private FunctionStateRecorder funcState;
 
-	}
+    public Map<VariableDefinition, VariableState> readVarState() {
+        return Collections.unmodifiableMap(variableStateMap);
+    }
 
-	public FunctionStateRecorder getFuncState() {
-		return funcState;
-	}
+    public Map<CursorDefinition, CursorState> readCursorState() {
+        return Collections.unmodifiableMap(cursorStateMap);
+    }
 
-	public State(Map<VariableDefinition, VariableState> varState, FunctionStateRecorder funcState) {
-		super();
-		this.varState = varState;
-		this.funcState = funcState;
-	}
+    public VariableState writeOneVariable(VariableDefinition def, VariableState s) {
+        if (locked) {
+            throw new RuntimeException("COW violated");
+        }
+        if (!varStateCopied) {
+            varStateCopied = true;
+            variableStateMap = new HashMap<>(variableStateMap);
+        }
+        return variableStateMap.put(def, s);
 
+    }
+
+    public CursorState writeOneCursorState(CursorDefinition cursorDefinition, CursorState s) {
+        if (locked) {
+            throw new RuntimeException("COW violated");
+        }
+        if (!cursorStateCopied) {
+            cursorStateCopied = true;
+            cursorStateMap = new HashMap<>(cursorStateMap);
+        }
+        return cursorStateMap.put(cursorDefinition, s);
+
+    }
+
+    public FunctionStateRecorder getFuncState() {
+        return funcState;
+    }
+
+    public State(Map<VariableDefinition, VariableState> variableStateMap, Map<CursorDefinition, CursorState> cursorStateMap, FunctionStateRecorder funcState) {
+        this.variableStateMap = variableStateMap;
+        this.cursorStateMap = cursorStateMap;
+        this.funcState = funcState;
+    }
 }
