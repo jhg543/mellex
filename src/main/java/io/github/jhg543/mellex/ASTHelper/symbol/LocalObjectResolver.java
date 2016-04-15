@@ -101,8 +101,8 @@ public class LocalObjectResolver {
         this.scopes.push(s);
     }
 
-    public Object getCurrentScopeId() {
-        return this.scopes.peek().getId();
+    public Object getCurrentScopeInfo() {
+        return this.scopes.peek();
     }
 
     public void popScope(Object expectedScopeId) {
@@ -117,12 +117,14 @@ public class LocalObjectResolver {
         Preconditions.checkState(this.scopes.peek().getCursors().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
     }
 
-    private static class Scope {
+    public static class Scope {
         Object id;
         Map<String, VariableDefinition> variables;
         Map<String, FunctionDefinition> functions;
         Map<String, CursorDefinition> cursors;
         Scope parentScope;
+
+        private Scope(){}
 
         public Object getId() {
             return id;

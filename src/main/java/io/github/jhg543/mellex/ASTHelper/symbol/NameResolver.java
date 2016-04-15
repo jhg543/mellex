@@ -1,19 +1,10 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
-import java.util.List;
-import java.util.Optional;
-
-import com.google.common.base.Preconditions;
-
-import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
-import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
-import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.*;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
+
+import java.util.List;
 
 public class NameResolver {
 	private AliasColumnResolver alias;
@@ -188,8 +179,8 @@ public class NameResolver {
 		return null;
 	}
 
-	public Object getCurrentScopeId() {
-		return local.getCurrentScopeId();
+	public Object getCurrentScopeInfo() {
+		return local.getCurrentScopeInfo();
 	}
 
 	/**

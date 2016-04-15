@@ -155,7 +155,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 if (!ctx.st.nodata) {
                     return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
                             CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), def.getColumns(), subs),
-                            nameResolver.getCurrentScopeId()));
+                            nameResolver.getCurrentScopeInfo()));
                 }
             } else {
                 // create table t as select cc from tt;
@@ -169,7 +169,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 if (!ctx.st.nodata) {
                     return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
                             CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), def.getColumns(), subs),
-                            nameResolver.getCurrentScopeId()));
+                            nameResolver.getCurrentScopeInfo()));
                 }
             }
         }
@@ -203,7 +203,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         List<StateFunc> subs = selectStmt.getColumns().stream().map(ResultColumn::getExpr).collect(Collectors.toList());
         return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(def.getColumns(), subs),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), def.getColumns(), subs),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -435,7 +435,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(cdefs, exprs),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cdefs, exprs),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -449,7 +449,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     public Object visitNon_subquery_select_stmt(Non_subquery_select_stmtContext ctx) {
         SelectStmtData ss = (SelectStmtData) ctx.select_stmt().accept(this);
         return instbuffer.add(new Instruction(InstFuncHelper.selectFunc(ss),
-                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), ss), nameResolver.getCurrentScopeId()));
+                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), ss), nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -771,7 +771,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(cdefs, exprs),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cdefs, exprs),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -811,7 +811,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             if (patchList == null) {
                 // a label so put a nop
                 patchList = instbuffer.add(new Instruction(InstFuncHelper.NopFunc(),
-                        "NOP @" + ctx.getStart().getText() + ctx.getStart().getLine(), nameResolver.getCurrentScopeId()));
+                        "NOP @" + ctx.getStart().getText() + ctx.getStart().getLine(), nameResolver.getCurrentScopeInfo()));
             }
             for (LabelContext labelctx : labels) {
                 String labelName = labelctx.label_name().getText();
@@ -836,13 +836,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         ExprAnalyzeResult rvalue = (ExprAnalyzeResult) ctx.rvalue.accept(this);
         return instbuffer.add(new Instruction(InstFuncHelper.assignExpression(lvalue, rvalue),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), lvalue, rvalue),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
     }
 
     @Override
     public PatchList visitNull_statement(Null_statementContext ctx) {
         return instbuffer.add(new Instruction(InstFuncHelper.NopFunc(), "NOP NULL STMT@" + ctx.getStart().getLine(),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -850,7 +850,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     public PatchList visitCall_statement(Call_statementContext ctx) {
         StateFunc fn = funcOfExpr(ctx.expr().accept(this));
         return instbuffer.add(new Instruction(InstFuncHelper.callExpression(fn),
-                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeId()));
+                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -878,7 +878,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         } else {
             // no instruction put
             patchList = instbuffer.add(new Instruction(InstFuncHelper.NopFunc(),
-                    "NOP @" + ctx.getStart().getText() + ctx.getStart().getLine(), nameResolver.getCurrentScopeId()));
+                    "NOP @" + ctx.getStart().getText() + ctx.getStart().getLine(), nameResolver.getCurrentScopeInfo()));
             return patchList;
         }
     }
@@ -890,7 +890,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             StateFunc fn = funcOfExpr(ctx.selector.accept(this));
             Instruction si = new Instruction(InstFuncHelper.branchCondFunc(fn),
                     CollectDebugInfo(ctx.selector.getClass().getName(), ctx.selector.getStart().getLine(), fn),
-                    nameResolver.getCurrentScopeId());
+                    nameResolver.getCurrentScopeInfo());
             instbuffer.add(si);
             p.setStartInstruction(si);
         }
@@ -901,7 +901,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             Instruction caseSelectorVal = new Instruction(InstFuncHelper.branchCondFunc(fn),
                     CollectDebugInfo(ctx.selector_vals.get(i).getClass().getName(),
                             ctx.selector_vals.get(i).getStart().getLine(), fn),
-                    nameResolver.getCurrentScopeId());
+                    nameResolver.getCurrentScopeInfo());
             instbuffer.add(caseSelectorVal);
             PatchList thenblock = (PatchList) ctx.then_stmts.get(i).accept(this);
             caseSelectorVal.addNextInstruction(thenblock.getStartInstruction());
@@ -942,7 +942,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             Instruction caseSelectorVal = new Instruction(InstFuncHelper.branchCondFunc(fn),
                     CollectDebugInfo(ctx.selector_vals.get(i).getClass().getName(),
                             ctx.selector_vals.get(i).getStart().getLine(), fn),
-                    nameResolver.getCurrentScopeId());
+                    nameResolver.getCurrentScopeInfo());
             instbuffer.add(caseSelectorVal);
             PatchList thenblock = (PatchList) ctx.then_stmts.get(i).accept(this);
             caseSelectorVal.addNextInstruction(thenblock.getStartInstruction());
@@ -997,7 +997,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         StateFunc whileCond = funcOfExpr(ctx.expr().accept(this));
         Instruction condInst = new Instruction(InstFuncHelper.branchCondFunc(whileCond),
-                CollectDebugInfo(ctx.getClass().getName(), whileCond), nameResolver.getCurrentScopeId());
+                CollectDebugInfo(ctx.getClass().getName(), whileCond), nameResolver.getCurrentScopeInfo());
         instbuffer.add(condInst);
         p.setStartInstruction(condInst);
 
@@ -1032,12 +1032,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         if (exprctx != null) {
             StateFunc fn = funcOfExpr(exprctx.accept(this));
             inst = new Instruction(InstFuncHelper.branchCondFunc(fn),
-                    CollectDebugInfo("Continue WHEN @" + ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeId());
+                    CollectDebugInfo("Continue WHEN @" + ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeInfo());
             p = instbuffer.add(inst);
 
         } else {
             inst = new Instruction(InstFuncHelper.NopFunc(), "NOP Continue @" + ctx.getStart().getLine(),
-                    nameResolver.getCurrentScopeId());
+                    nameResolver.getCurrentScopeInfo());
             p = instbuffer.add(inst);
             p.setNextList(Collections.emptyList());
         }
@@ -1058,12 +1058,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         if (exprctx != null) {
             StateFunc fn = funcOfExpr(exprctx.accept(this));
             inst = new Instruction(InstFuncHelper.branchCondFunc(fn),
-                    CollectDebugInfo("EXIT WHEN @" + ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeId());
+                    CollectDebugInfo("EXIT WHEN @" + ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeInfo());
             p = instbuffer.add(inst);
 
         } else {
             inst = new Instruction(InstFuncHelper.NopFunc(), "NOP EXIT @" + ctx.getStart().getLine(),
-                    nameResolver.getCurrentScopeId());
+                    nameResolver.getCurrentScopeInfo());
             p = instbuffer.add(inst);
             p.setNextList(Collections.emptyList());
         }
@@ -1239,7 +1239,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 VariableDefinition dynamicSqlVariable = nameResolver.searchVariable(ctx.any_name().getText());
                 return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncDynamic(cursorDefinition, dynamicSqlVariable),
                         CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, dynamicSqlVariable),
-                        nameResolver.getCurrentScopeId()));
+                        nameResolver.getCurrentScopeInfo()));
 
 
             } else {
@@ -1252,7 +1252,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 }
                 return instbuffer.add(new Instruction(InstFuncHelper.openCursorFuncStatic(cursorDefinition, ss),
                         CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, ss),
-                        nameResolver.getCurrentScopeId()));
+                        nameResolver.getCurrentScopeInfo()));
             }
 
         } else {
@@ -1278,7 +1278,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
             return instbuffer.add(new Instruction(InstFuncHelper.openCursorFuncStatic(cursorDefinition, appliedStmt),
                     CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, appliedStmt),
-                    nameResolver.getCurrentScopeId()));
+                    nameResolver.getCurrentScopeInfo()));
         }
 
     }
@@ -1293,7 +1293,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         }
         return instbuffer.add(new Instruction(InstFuncHelper.fetchCursorFunc(cursorDefinition, intos),
                 CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, intos),
-                nameResolver.getCurrentScopeId()));
+                nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -1316,7 +1316,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             ExprAnalyzeResult e = (ExprAnalyzeResult) exprContext.accept(this);
             return instbuffer.add(new Instruction(InstFuncHelper.assignExpression(def, e),
                     CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), def, e),
-                    nameResolver.getCurrentScopeId()));
+                    nameResolver.getCurrentScopeInfo()));
         } else {
             return null;
         }

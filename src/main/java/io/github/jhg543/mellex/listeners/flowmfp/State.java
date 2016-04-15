@@ -68,9 +68,13 @@ public class State {
         return funcState;
     }
 
-    public State(Map<VariableDefinition, VariableState> variableStateMap, Map<CursorDefinition, CursorState> cursorStateMap, FunctionStateRecorder funcState) {
+    private State(Map<VariableDefinition, VariableState> variableStateMap, Map<CursorDefinition, CursorState> cursorStateMap, FunctionStateRecorder funcState) {
         this.variableStateMap = variableStateMap;
         this.cursorStateMap = cursorStateMap;
         this.funcState = funcState;
+    }
+
+    public static State newInitialState(FunctionStateRecorder recorder) {
+        return new State(new HashMap<>(), new HashMap<>(), recorder);
     }
 }
