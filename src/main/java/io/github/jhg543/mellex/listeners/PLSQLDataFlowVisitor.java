@@ -1255,12 +1255,30 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         } else {
             // args present
             ExprFunctionContext cursorCall = (ExprFunctionContext) expr;
-            CursorDefinition cdef = nameResolver.searchCursor(cursorCall.function_name().getText());
-            SelectStmtData ss = cdef.getSelectStmt();
-            
+            CursorDefinition cursorDefinition = nameResolver.searchCursor(cursorCall.function_name().getText());
+            SelectStmtData ss = cursorDefinition.getSelectStmt();
 
+            // apply parameters to select stmt
+            Preconditions.checkState(cursorDefinition.getParameters().size() == cursorCall.ex.size(), "cursor %s parameter size mismatch", cursorDefinition.getName());
+            List<ResultColumn> newrs = new ArrayList<>();
+            Map<ObjectDefinition, StateFunc> pvs = new HashMap<>();
+            for (int i = 0; i < cursorDefinition.getParameters().size(); ++i) {
+                StateFunc fn = funcOfExpr(cursorCall.ex.get(i).accept(this));
+                pvs.put(cursorDefinition.getParameters().get(i), fn);
+            }
+
+            for (ResultColumn rc : ss.getColumns()) {
+                newrs.add(new ResultColumn(rc.getName(), rc.getPosition(), rc.getExpr().applyDefinition(pvs)));
+            }
+
+            SelectStmtData appliedStmt = new SelectStmtData(newrs);
+
+
+            return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncStatic(cursorDefinition, appliedStmt),
+                    CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, appliedStmt),
+                    nameResolver.getCurrentScopeId()));
         }
-        return null;
+
 
     }
 

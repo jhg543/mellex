@@ -1,14 +1,6 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import com.google.common.base.Preconditions;
+import java.util.*;
 
 public class FunctionDefinition extends ObjectDefinition {
 
@@ -42,7 +34,7 @@ public class FunctionDefinition extends ObjectDefinition {
 		for (int i = 0; i < params.size(); ++i) {
 			paramValues.put(parameters.get(i), params.get(i));
 		}
-		return definition.apply(paramValues);
+		return definition.applyDefinition(paramValues);
 	}
 
 	private static Map<Integer, FunctionDefinition> unknown = new HashMap<>();

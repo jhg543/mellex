@@ -1,21 +1,13 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collector;
-import java.util.stream.Stream;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
 
 import static java.util.stream.Collectors.*;
 
@@ -98,7 +90,6 @@ public class StateFunc {
 		subs.stream().flatMap(s -> s.entrySet().stream())
 				.collect(groupingBy(e -> e.getKey(), mapping(e -> e.getValue(), toList())))
 				.forEach((k, v) -> as.put(k, valueCombiner.apply(v)));
-		;
 
 		return as.build();
 	}
@@ -265,7 +256,7 @@ public class StateFunc {
 
 	}
 
-	public StateFunc apply(Map<ObjectDefinition, StateFunc> parameterValues) {
+	public StateFunc applyDefinition(Map<ObjectDefinition, StateFunc> parameterValues) {
 		// (1) mutate s(f) to s2(f) with param value paramI.ValueFunc.
 		// (2) return combine ( s2(f) s(param1) s(param2) s param(3) )
 		if (parameterValues.isEmpty()) {

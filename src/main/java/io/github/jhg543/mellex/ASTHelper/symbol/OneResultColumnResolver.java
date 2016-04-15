@@ -1,24 +1,16 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-
 import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.ResultColumn;
 import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.util.tuple.Tuple2;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class OneResultColumnResolver {
 
@@ -83,7 +75,7 @@ public class OneResultColumnResolver {
 
 	public SelectStmtData rewriteStateFunc(SelectStmtData tempResult) {
 
-		List<ResultColumn> columns = (List<ResultColumn>) tempResult.getColumns();
+		List<ResultColumn> columns = tempResult.getColumns();
 		List<Set<Integer>> outEdgeNumber = outedges.stream()
 				.map(s -> s.stream().map(tempResult.getNameIndexMap()::get).collect(Collectors.toSet()))
 				.collect(Collectors.toList());
@@ -138,7 +130,7 @@ public class OneResultColumnResolver {
 			StateFunc s = result.get(i);
 			Map<ObjectDefinition, StateFunc> applyParam = new HashMap<>();
 			out.get(i).forEach(n -> applyParam.put(t.apply(n), result.get(n)));
-			result.set(i, s.apply(applyParam));
+			result.set(i, s.applyDefinition(applyParam));
 
 			resolveprocess[i] = 2;
 		}
