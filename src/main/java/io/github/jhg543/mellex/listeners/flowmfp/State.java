@@ -40,7 +40,7 @@ public class State {
         return Collections.unmodifiableMap(cursorStateMap);
     }
 
-    public VariableState writeOneVariable(VariableDefinition def, VariableState s) {
+    public VariableState writeVariable(VariableDefinition def, VariableState s) {
         if (locked) {
             throw new RuntimeException("COW violated");
         }
@@ -52,7 +52,7 @@ public class State {
 
     }
 
-    public CursorState writeOneCursorState(CursorDefinition cursorDefinition, CursorState s) {
+    public CursorState writeCursorState(CursorDefinition cursorDefinition, CursorState s) {
         if (locked) {
             throw new RuntimeException("COW violated");
         }
@@ -62,6 +62,29 @@ public class State {
         }
         return cursorStateMap.put(cursorDefinition, s);
 
+    }
+
+    public VariableState removeVariable(VariableDefinition def) {
+        if (locked) {
+            throw new RuntimeException("COW violated");
+        }
+        if (!varStateCopied) {
+            varStateCopied = true;
+            variableStateMap = new HashMap<>(variableStateMap);
+        }
+        return variableStateMap.remove(def);
+
+    }
+
+    public CursorState removeCursorState(CursorDefinition cursorDefinition) {
+        if (locked) {
+            throw new RuntimeException("COW violated");
+        }
+        if (!cursorStateCopied) {
+            cursorStateCopied = true;
+            cursorStateMap = new HashMap<>(cursorStateMap);
+        }
+        return cursorStateMap.remove(cursorDefinition);
     }
 
     public FunctionStateRecorder getFuncState() {
@@ -76,5 +99,21 @@ public class State {
 
     public static State newInitialState(FunctionStateRecorder recorder) {
         return new State(new HashMap<>(), new HashMap<>(), recorder);
+    }
+
+    public String printDebugInfo()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        readVarState().forEach((k,v)->{
+            sb.append(k.getName());
+            sb.append("-");
+            v.getValueInfluence().getObjects().stream().map(o->o.getObjectDefinition().getName()).distinct().forEach(s->{sb.append(s);sb.append(" ");});
+            v.getValueInfluence().getParameters().stream().map(o->o.getName()).distinct().forEach(s->{sb.append(s);sb.append(" ");});
+            sb.append("/");
+        });
+
+        sb.append("]\n");
+        return sb.toString();
     }
 }

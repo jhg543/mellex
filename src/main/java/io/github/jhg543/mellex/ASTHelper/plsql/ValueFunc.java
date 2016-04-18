@@ -1,12 +1,8 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import com.google.common.collect.ImmutableSet;
+
+import java.util.*;
 
 public class ValueFunc {
 	private Set<ObjectReference> objects;
@@ -37,28 +33,35 @@ public class ValueFunc {
 		return objects.isEmpty() && parameters.isEmpty();
 	}
 
-	public static ValueFunc of(ObjectReference... columnReference) {
+	public static ValueFunc ofColumnReference(ObjectReference... columnReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = ImmutableSet.copyOf(columnReference);
 		v.parameters = Collections.emptySet();
 		return v;
 	}
 
-	public static ValueFunc of(ObjectDefinition... variableReference) {
+	public static ValueFunc ofVariableReference(ObjectDefinition... variableReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = Collections.emptySet();
 		v.parameters = ImmutableSet.copyOf(variableReference);
 		return v;
 	}
 
-	public static ValueFunc of(Collection<? extends ObjectDefinition> variableReference,
-			Collection<? extends ObjectReference> columnReference) {
+	public static ValueFunc ofImmutable(Collection<? extends ObjectDefinition> variableReference,
+										Collection<? extends ObjectReference> columnReference) {
 		ValueFunc v = new ValueFunc();
 		v.objects = ImmutableSet.copyOf(columnReference);
 		v.parameters = ImmutableSet.copyOf(variableReference);
 		return v;
 	}
 
+	public static ValueFunc buildDirect(Set<ObjectDefinition> variableReference,
+										Set<ObjectReference> columnReference) {
+		ValueFunc v = new ValueFunc();
+		v.objects = columnReference;
+		v.parameters = variableReference;
+		return v;
+	}
 
 	public static class Builder {
 		private int entries;

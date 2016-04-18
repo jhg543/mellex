@@ -16,7 +16,6 @@ import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.TokenStream;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
@@ -148,7 +147,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
                 for (ColumnDefinition srcColDef : sourceTableDef.getColumns()) {
 
                     def.addColumn(srcColDef.getName());
-                    subs.add(StateFunc.ofValue(ValueFunc.of(new ObjectReference(srcColDef, current_file,
+                    subs.add(StateFunc.ofValue(ValueFunc.ofColumnReference(new ObjectReference(srcColDef, current_file,
                             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()))));
                 }
                 nameResolver.defineTable(tableName, def);
@@ -324,14 +323,14 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             if (def instanceof ColumnDefinition) {
                 ObjectReference r = new ObjectReference(def, current_file, ctx.getStart().getLine(),
                         ctx.getStart().getCharPositionInLine());
-                return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(r)));
+                return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.ofColumnReference(r)));
             } else if (def instanceof VariableDefinition) {
                 return new ExprAnalyzeResult((VariableDefinition) def);
             }
 
             // if here , it's deferred resultcolumn resolution in
             // OtherResultColumnResolver
-            return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.of(def)));
+            return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.ofVariableReference(def)));
         }
 
         return new ExprAnalyzeResult(dd.getField1());
@@ -1093,7 +1092,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         FunctionDefinition functionDefinition = new FunctionDefinition();
         functionDefinition.setName(ctx.object_name().getText());
         List<ParameterDefinition> parameterDefinitions = Collections.emptyList();
-        if (ctx.parameter_declarations()!=null) {
+        if (ctx.parameter_declarations() != null) {
             parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations().accept(this);
         }
         functionDefinition.setParameters(parameterDefinitions);
@@ -1135,10 +1134,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         }
 
+        // TODO what to do with end of program?
+        /*
         Instruction programEnd = new Instruction(Function.identity(), "END OF FUNCTION", bodyctx);
         programEnd.setId(-1);
 
         instSeq.get(instSeq.size() - 1).getNextList().forEach(i -> i.addNextInstruction(programEnd));
+        */
         nameResolver.endBlock(bodyctx);
         nameResolver.exitFunctionDefinition(ctx);
         instbuffer.exitFunctionDef();
@@ -1284,11 +1286,18 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     }
 
     @Override
+    public PatchList visitClose_statement(Close_statementContext ctx) {
+        CursorDefinition cursorDefinition = nameResolver.searchCursor(ctx.object_name().getText());
+        return instbuffer.add(new Instruction(InstFuncHelper.closeCursorFunc(cursorDefinition),
+                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition),
+                nameResolver.getCurrentScopeInfo()));
+    }
+
+    @Override
     public PatchList visitFetch_statement(Fetch_statementContext ctx) {
         CursorDefinition cursorDefinition = nameResolver.searchCursor(ctx.cursor.getText());
         List<VariableDefinition> intos = new ArrayList<>();
-        for (Object_nameContext objctx:ctx.vars)
-        {
+        for (Object_nameContext objctx : ctx.vars) {
             intos.add(nameResolver.searchVariable(objctx.getText()));
         }
         return instbuffer.add(new Instruction(InstFuncHelper.fetchCursorFunc(cursorDefinition, intos),

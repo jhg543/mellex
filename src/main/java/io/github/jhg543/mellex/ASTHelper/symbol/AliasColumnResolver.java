@@ -1,29 +1,19 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import io.github.jhg543.mellex.ASTHelper.plsql.*;
+import io.github.jhg543.mellex.util.tuple.Tuple2;
+import io.github.jhg543.mellex.util.tuple.Tuple3;
+
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.google.common.base.CharMatcher;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-
-import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
-import io.github.jhg543.mellex.ASTHelper.plsql.SelectStmtData;
-import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
-import io.github.jhg543.mellex.ASTHelper.plsql.TableDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
-import io.github.jhg543.mellex.util.tuple.Tuple2;
-import io.github.jhg543.mellex.util.tuple.Tuple3;
 
 public class AliasColumnResolver {
 
@@ -104,7 +94,7 @@ public class AliasColumnResolver {
 
 		Stream<Tuple2<String, StateFunc>> b = s.getLiveTables().entrySet().stream()
 				.flatMap(es -> es.getValue().getColumns().stream().map(e -> Tuple2.of(e.getName(),
-						StateFunc.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition))))));
+						StateFunc.ofValue(ValueFunc.ofColumnReference(new ObjectReference(e, fileName, lineNumber, charPosition))))));
 		return Stream.concat(a, b).collect(Collectors.toList());
 	}
 
@@ -124,7 +114,7 @@ public class AliasColumnResolver {
 		if (td != null) {
 			return td.getColumns().stream()
 					.map(e -> Tuple2.of(e.getName(),
-							StateFunc.ofValue(ValueFunc.of(new ObjectReference(e, fileName, lineNumber, charPosition)))))
+							StateFunc.ofValue(ValueFunc.ofColumnReference(new ObjectReference(e, fileName, lineNumber, charPosition)))))
 					.collect(Collectors.toList());
 		}
 

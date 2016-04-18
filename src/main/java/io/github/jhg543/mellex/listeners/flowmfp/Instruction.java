@@ -9,19 +9,19 @@ public class Instruction {
 
     private int id;
     private Object debugInfo;
-    private Object scopeId;
+    private Object scopeInfo;
     private Function<State, State> func;
     private Collection<Supplier<Instruction>> nextPc;
-    public Instruction(Function<State, State> func, Object debugInfo, Object scopeId) {
+    public Instruction(Function<State, State> func, Object debugInfo, Object scopeInfo) {
         super();
         this.func = func;
         this.debugInfo = debugInfo;
-        this.scopeId = scopeId;
+        this.scopeInfo = scopeInfo;
         this.nextPc = new ArrayList<>();
     }
 
-    public Object getScopeId() {
-        return scopeId;
+    public Object getScopeInfo() {
+        return scopeInfo;
     }
 
     public int getId() {

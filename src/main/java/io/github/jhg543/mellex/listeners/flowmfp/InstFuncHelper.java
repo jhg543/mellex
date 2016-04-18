@@ -53,7 +53,7 @@ public class InstFuncHelper {
         // during one instruction
         // TODO check k is VariableDefinition
         fn.getAssigns().forEach((k, v) -> {
-            newState.writeOneVariable((VariableDefinition) k, new VariableState(v, null));
+            newState.writeVariable((VariableDefinition) k, new VariableState(v, null));
         });
 
     }
@@ -92,7 +92,7 @@ public class InstFuncHelper {
 
             // TODO possible literal
 
-            ns.writeOneVariable(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()),
+            ns.writeVariable(lvalue, new VariableState(fn.getValue().add(fn.getBranchCond()),
                     applyPossibleLiteralValue(exprDefinition.getLiteralValue(), s)));
 
             return ns;
@@ -153,7 +153,7 @@ public class InstFuncHelper {
                 StateFunc fn = applyState(ss.getColumnExprFunc(i), s);
                 metFn(fn, ns);
                 if (intos != null) {
-                    ns.writeOneVariable(intos.get(i), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
+                    ns.writeVariable(intos.get(i), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
                 }
             }
 
@@ -191,7 +191,16 @@ public class InstFuncHelper {
                 metFn(fn, ns);
                 csbuilder.put(rc.getName(), new VariableState(fn.getValue().add(fn.getBranchCond()), null));
             }
-            ns.writeOneCursorState(cursorDefinition, csbuilder.build());
+            ns.writeCursorState(cursorDefinition, csbuilder.build());
+            return ns;
+        };
+        return fff;
+    }
+
+    public static Function<State, State> closeCursorFunc(CursorDefinition cursorDefinition) {
+        Function<State, State> fff = (State s) -> {
+            State ns = s.copy();
+            ns.removeCursorState(cursorDefinition);
             return ns;
         };
         return fff;
@@ -205,18 +214,18 @@ public class InstFuncHelper {
         Function<State, State> fff = (State s) -> {
             State ns = s.copy();
             CursorState cs = s.readCursorState().get(cursorDefinition);
-            if (intos.size() >= 1 && intos.size() != cs.getColumns().size()) {
+            if (intos.size() > 1 && intos.size() != cs.getColumns().size()) {
                 throw new IllegalStateException(String.format("Fetch into size mismatch %d %d", intos.size(), cs.getColumns().size()));
             }
 
             if (intos.size() == cs.getColumns().size()) {
                 // into multiple variables
                 for (int i = 0; i < cs.getColumns().size(); ++i) {
-                    ns.writeOneVariable(intos.get(i), cs.getColumns().get(i));
+                    ns.writeVariable(intos.get(i), cs.getColumns().get(i));
                 }
             } else {
                 // into a record
-                cs.getNameIndexMap().forEach((name, index) -> ns.writeOneVariable(intos.get(0).getColumn(name), cs.getColumns().get(index)));
+                cs.getNameIndexMap().forEach((name, index) -> ns.writeVariable(intos.get(0).getColumn(name), cs.getColumns().get(index)));
             }
 
             return ns;

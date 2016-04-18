@@ -258,7 +258,7 @@ case_statement :
     ;
 
 close_statement :
-        K_CLOSE any_name ( '.' any_name )?
+        K_CLOSE object_name
     ;
 
 continue_statement :

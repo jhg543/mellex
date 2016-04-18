@@ -1,9 +1,9 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
+import com.google.common.collect.ImmutableList;
+
 import java.util.Collections;
 import java.util.List;
-
-import com.google.common.collect.ImmutableList;
 
 public class ExprAnalyzeResult {
 	private StateFunc transformation;
@@ -25,7 +25,7 @@ public class ExprAnalyzeResult {
 
 	public ExprAnalyzeResult(VariableDefinition vd) {
 		super();
-		this.transformation = StateFunc.ofValue(ValueFunc.of(vd));
+		this.transformation = StateFunc.ofValue(ValueFunc.ofVariableReference(vd));
 		this.literalValue = ImmutableList.of(vd);
 	}
 

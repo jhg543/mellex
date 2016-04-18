@@ -27,7 +27,7 @@ public class CursorState {
     }
 
     public static class Builder {
-        private OrderedMap.Builder<String, VariableState> b;
+        private OrderedMap.Builder<String, VariableState> b = OrderedMap.builder();
 
         public int put(String key, VariableState value) {
             return b.put(key, value);

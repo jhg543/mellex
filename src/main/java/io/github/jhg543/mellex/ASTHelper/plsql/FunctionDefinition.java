@@ -48,7 +48,7 @@ public class FunctionDefinition extends ObjectDefinition {
 			params.add(v);
 		}
 		d.setParameters(params);
-		StateFunc func = StateFunc.ofValue(ValueFunc.of(params, Collections.emptyList()));
+		StateFunc func = StateFunc.ofValue(ValueFunc.ofImmutable(params, Collections.emptyList()));
 		d.setDefinition(func);
 		return d;
 	}

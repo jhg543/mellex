@@ -101,7 +101,7 @@ public class LocalObjectResolver {
         this.scopes.push(s);
     }
 
-    public Object getCurrentScopeInfo() {
+    public Scope getCurrentScopeInfo() {
         return this.scopes.peek();
     }
 

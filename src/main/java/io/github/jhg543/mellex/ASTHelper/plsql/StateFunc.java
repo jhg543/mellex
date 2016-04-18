@@ -175,7 +175,7 @@ public class StateFunc {
 			if (so.size() == v.getObjects().size()) {
 				so = v.getObjects();
 			}
-			return ValueFunc.of(params.build(), so);
+			return ValueFunc.ofImmutable(params.build(), so);
 		}
 	}
 

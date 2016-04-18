@@ -1,15 +1,10 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
+import com.google.common.collect.ImmutableList;
+import io.github.jhg543.mellex.ASTHelper.plsql.*;
+
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-
-import com.google.common.collect.ImmutableList;
-
-import io.github.jhg543.mellex.ASTHelper.plsql.ColumnDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.FilteredValueFunc;
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
-import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 
 /**
  * 
@@ -18,6 +13,7 @@ import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
 public class FunctionStateRecorder extends StateFunc {
 	public FunctionStateRecorder() {
 		this.updates = new LinkedHashMap<ObjectDefinition, FilteredValueFunc>();
+		this.branchCond = ValueFunc.of();
 	}
 
 	public void addBranch(StateFunc branchCond) {
