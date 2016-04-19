@@ -968,16 +968,20 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     @Override
     public PatchList visitBasic_loop_statement(Basic_loop_statementContext ctx) {
         labelRecorder.enterLoop();
-        PatchList stmts = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
-        Instruction first = stmts.getStartInstruction();
-        for (Instruction topatch : stmts.getNextList()) {
-            topatch.addNextInstruction(first);
+        PatchList loopBody = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+        Instruction first = loopBody.getStartInstruction();
+        // goto start of loop
+        for (Instruction instructionToPatch : loopBody.getNextList()) {
+            instructionToPatch.addNextInstruction(first);
         }
         PatchList p = new PatchList();
         p.setStartInstruction(first);
 
+        // break = goto "nextlist"
         p.getNextList().addAll(labelRecorder.getCurrentBreaks());
+        // continue = goto "start of loop"
         labelRecorder.getCurrentContinues().forEach(i -> i.addNextInstruction(first));
+        // labelel breaks and continues
         if (ctx.label_name() != null) {
             String label = ctx.label_name().getText();
             // TODO if duplicate label?
@@ -1001,11 +1005,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         p.setStartInstruction(condInst);
 
         labelRecorder.enterLoop();
-        PatchList stmts = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+        PatchList whileBodyInstructions = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
 
-        condInst.addNextInstruction(stmts.getStartInstruction());
-        for (Instruction topatch : stmts.getNextList()) {
-            topatch.addNextInstruction(condInst);
+        condInst.addNextInstruction(whileBodyInstructions.getStartInstruction());
+        for (Instruction instructionToPatch : whileBodyInstructions.getNextList()) {
+            instructionToPatch.addNextInstruction(condInst);
         }
 
         p.getNextList().addAll(labelRecorder.getCurrentBreaks());
@@ -1078,7 +1082,57 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
     @Override
     public Object visitFor_loop_statement(For_loop_statementContext ctx) {
+
+        nameResolver.startBlock(ctx);
+        String loopVarName = ctx.loopvar.getText();
+        VariableDefinition vd = new VariableDefinition();
+        vd.setName(loopVarName);
+        nameResolver.defineVariable(vd);
+
         // TODO Auto-generated method stub
+        /*
+        for i in lowerbound..upperbound   -->
+        branchCond(lowerbound + upperbond)
+        loop stmts nop(branch) endloop;
+         */
+
+        /*
+        for i in select stmt   -->
+        loop; select ss into i; stmts; endloop
+        */
+
+        /*
+        for i in cursor   -->
+        open cursor x; loop; fetch x into i; stmts; endloop
+        */
+
+
+        labelRecorder.enterLoop();
+        PatchList loopBody = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+        Instruction startOfLoop = loopBody.getStartInstruction();
+        // goto start of loop
+        for (Instruction instructionToPatch : loopBody.getNextList()) {
+            instructionToPatch.addNextInstruction(startOfLoop);
+        }
+        PatchList p = new PatchList();
+        p.setStartInstruction(startOfLoop);
+
+        // break = goto "nextlist"
+        p.getNextList().addAll(labelRecorder.getCurrentBreaks());
+        // continue = goto "start of loop"
+        labelRecorder.getCurrentContinues().forEach(i -> i.addNextInstruction(startOfLoop));
+        // labelel breaks and continues
+        if (ctx.label_name() != null) {
+            String label = ctx.label_name().getText();
+            // TODO if duplicate label?
+            Optional.ofNullable(labelRecorder.getBreakLabels().remove(label)).ifPresent(p.getNextList()::addAll);
+            Optional.ofNullable(labelRecorder.getContinueLabels().remove(label))
+                    .ifPresent(list -> list.forEach(i -> i.addNextInstruction(startOfLoop)));
+        }
+
+        labelRecorder.exitLoop();
+
+        nameResolver.endBlock(ctx);
         return super.visitFor_loop_statement(ctx);
     }
 

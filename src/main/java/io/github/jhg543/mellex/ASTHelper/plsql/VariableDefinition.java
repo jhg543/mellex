@@ -5,6 +5,12 @@ import java.util.Map;
 
 public class VariableDefinition extends ObjectDefinition {
 
+	public VariableDefinition getParentOfRecord() {
+		return parentOfRecord;
+	}
+
+	private VariableDefinition parentOfRecord;
+
 	private Map<String, VariableDefinition> columns;
 
 	@Override
@@ -25,6 +31,7 @@ public class VariableDefinition extends ObjectDefinition {
 		if (v == null) {
 
 			v = new VariableDefinition();
+			v.parentOfRecord = this;
 			v.setControlBlock(getControlBlock());
 			v.setName(getName() + "." + name);
 			columns.put(name, v);

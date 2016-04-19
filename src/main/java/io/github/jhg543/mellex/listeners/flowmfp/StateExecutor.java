@@ -52,7 +52,7 @@ public class StateExecutor {
                 State oldNextState = states.get(nextInstruction.getId());
                 Function<VariableDefinition, Boolean> variableScopeChecker = v -> Boolean.TRUE;
                 if (currentInstruction.getScopeInfo() != nextInstruction.getScopeInfo()) {
-                    variableScopeChecker = isVariableLive((LocalObjectResolver.Scope)nextInstruction.getScopeInfo());
+                    variableScopeChecker = isVariableLive((LocalObjectResolver.Scope) nextInstruction.getScopeInfo());
                 }
 
                 State combinedState = compareAndCombineState(nextState, oldNextState, variableScopeChecker);
@@ -197,6 +197,9 @@ public class StateExecutor {
      */
     private static Function<VariableDefinition, Boolean> isVariableLive(LocalObjectResolver.Scope scope) {
         return v -> {
+            while (v.getParentOfRecord() != null) {
+                v = v.getParentOfRecord();
+            }
             LocalObjectResolver.Scope s = scope;
             while (s != null) {
                 if (s.getVariables().get(v) != null) {
