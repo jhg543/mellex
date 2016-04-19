@@ -1,5 +1,7 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
+import io.github.jhg543.mellex.ASTHelper.symbol.LocalObjectStatusSnapshot;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.function.Function;
@@ -9,10 +11,10 @@ public class Instruction {
 
     private int id;
     private Object debugInfo;
-    private Object scopeInfo;
+    private LocalObjectStatusSnapshot scopeInfo;
     private Function<State, State> func;
     private Collection<Supplier<Instruction>> nextPc;
-    public Instruction(Function<State, State> func, Object debugInfo, Object scopeInfo) {
+    public Instruction(Function<State, State> func, Object debugInfo, LocalObjectStatusSnapshot scopeInfo) {
         super();
         this.func = func;
         this.debugInfo = debugInfo;
@@ -20,7 +22,7 @@ public class Instruction {
         this.nextPc = new ArrayList<>();
     }
 
-    public Object getScopeInfo() {
+    public LocalObjectStatusSnapshot getScopeInfo() {
         return scopeInfo;
     }
 

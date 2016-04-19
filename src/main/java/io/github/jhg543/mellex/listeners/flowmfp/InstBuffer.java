@@ -2,6 +2,8 @@ package io.github.jhg543.mellex.listeners.flowmfp;
 
 import com.google.common.base.Joiner;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
+import io.github.jhg543.mellex.ASTHelper.symbol.LocalObjectResolver;
+import io.github.jhg543.mellex.ASTHelper.symbol.LocalObjectStatusSnapshot;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -23,7 +25,7 @@ public class InstBuffer {
         stack.push(one);
     }
 
-    public void exitFunctionDef() {
+    public void exitFunctionDef(LocalObjectStatusSnapshot snapshot) {
         OneFunctionBuffer fb = stack.pop();
 
         // TODO this is a debug..
@@ -31,8 +33,9 @@ public class InstBuffer {
         PrintWriter w = new PrintWriter(System.out);
 
         if (fb.instbuffer.size() > 0) {
-            StateExecutor exec = new StateExecutor(fb.getInstbuffer());
-            exec.run();
+            StateExecutor exec = new StateExecutor(fb.getInstbuffer(),fb.fndef);
+
+            exec.run(v-> LocalObjectResolver.isVariableLive(v,snapshot));
             printFunctionInst(fb, w, exec);
             w.flush();
         }
@@ -69,6 +72,9 @@ public class InstBuffer {
                 w.write(Joiner.on(',').join(i.getNextPc().stream().map(s -> s.get().getId()).collect(Collectors.toList())));
                 w.write('\n');
             }
+            w.append("FUNCTION DEF = ");
+            w.append(b.fndef.getDefinition().toString());
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

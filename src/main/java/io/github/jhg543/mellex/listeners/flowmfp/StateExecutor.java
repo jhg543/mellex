@@ -1,26 +1,24 @@
 package io.github.jhg543.mellex.listeners.flowmfp;
 
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectDefinition;
-import io.github.jhg543.mellex.ASTHelper.plsql.ObjectReference;
-import io.github.jhg543.mellex.ASTHelper.plsql.ValueFunc;
-import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
+import io.github.jhg543.mellex.ASTHelper.plsql.*;
 import io.github.jhg543.mellex.ASTHelper.symbol.LocalObjectResolver;
+import io.github.jhg543.mellex.ASTHelper.symbol.LocalObjectStatusSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Created by z089 on 2016/4/15.
  */
 public class StateExecutor {
     private static final Logger log = LoggerFactory.getLogger(StateExecutor.class);
-    private FunctionStateRecorder functionStateRecorder;
     private List<Instruction> instructionList;
-
+    private FunctionDefinition functionDefinition;
 
     private List<State> states;
 
@@ -28,14 +26,15 @@ public class StateExecutor {
         return states;
     }
 
-    public StateExecutor(List<Instruction> list) {
+    public StateExecutor(List<Instruction> list, FunctionDefinition functionDefinition) {
         this.instructionList = list;
+        this.functionDefinition = functionDefinition;
     }
 
 
-    public FunctionStateRecorder run() {
+    public FunctionStateRecorder run(Predicate<VariableDefinition> variableLiveChecker) {
         states = Arrays.asList(new State[instructionList.size()]);
-        FunctionStateRecorder recorder = new FunctionStateRecorder();
+        FunctionStateRecorder recorder = new FunctionStateRecorder(functionDefinition.getParameters().stream().filter(pd -> pd.getFunctionBodyVariable() != null).collect(Collectors.toList()), variableLiveChecker);
         // empty state as 0
         State initialState = State.newInitialState(recorder);
         states.set(0, initialState);
@@ -50,9 +49,9 @@ public class StateExecutor {
             for (Supplier<Instruction> nip : currentInstruction.getNextPc()) {
                 Instruction nextInstruction = nip.get();
                 State oldNextState = states.get(nextInstruction.getId());
-                Function<VariableDefinition, Boolean> variableScopeChecker = v -> Boolean.TRUE;
+                Predicate<VariableDefinition> variableScopeChecker = v -> Boolean.TRUE;
                 if (currentInstruction.getScopeInfo() != nextInstruction.getScopeInfo()) {
-                    variableScopeChecker = isVariableLive((LocalObjectResolver.Scope) nextInstruction.getScopeInfo());
+                    variableScopeChecker = isVariableLive(nextInstruction.getScopeInfo());
                 }
 
                 State combinedState = compareAndCombineState(nextState, oldNextState, variableScopeChecker);
@@ -62,6 +61,7 @@ public class StateExecutor {
                 }
             }
         }
+        functionDefinition.setDefinition(recorder.outputDefinition());
         return recorder;
     }
 
@@ -120,13 +120,13 @@ public class StateExecutor {
      * @param variableScopeChecker whether a variable is live in America
      * @return combined value or null is not modified
      */
-    private static State compareAndCombineState(State whiteMan, State nativeAmerican, Function<VariableDefinition, Boolean> variableScopeChecker) {
+    private static State compareAndCombineState(State whiteMan, State nativeAmerican, Predicate<VariableDefinition> variableScopeChecker) {
 
         if (nativeAmerican == null) {
             AtomicBoolean modified = new AtomicBoolean(false);
             State c = whiteMan.copy();
             whiteMan.readVarState().forEach((variableDefinition, variableState) -> {
-                if (!variableScopeChecker.apply(variableDefinition)) {
+                if (!variableScopeChecker.test(variableDefinition)) {
                     c.removeVariable(variableDefinition);
                     modified.set(true);
                 }
@@ -146,7 +146,7 @@ public class StateExecutor {
             State c = nativeAmerican.copy();
             AtomicBoolean modified = new AtomicBoolean(false);
             whiteMan.readVarState().forEach((variableDefinition, variableState) -> {
-                if (!variableScopeChecker.apply(variableDefinition)) {
+                if (!variableScopeChecker.test(variableDefinition)) {
                     return;
                 }
                 VariableState oldVariableState = nativeAmerican.readVarState().get(variableDefinition);
@@ -195,20 +195,9 @@ public class StateExecutor {
      * @param scope
      * @return
      */
-    private static Function<VariableDefinition, Boolean> isVariableLive(LocalObjectResolver.Scope scope) {
-        return v -> {
-            while (v.getParentOfRecord() != null) {
-                v = v.getParentOfRecord();
-            }
-            LocalObjectResolver.Scope s = scope;
-            while (s != null) {
-                if (s.getVariables().get(v) != null) {
-                    return true;
-                }
-                s = s.getParentScope();
-            }
-            return false;
-        };
+    private static Predicate<VariableDefinition> isVariableLive(LocalObjectStatusSnapshot scope) {
+        return v -> LocalObjectResolver.isVariableLive(v, scope);
+
     }
 
 

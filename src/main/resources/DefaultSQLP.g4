@@ -85,7 +85,7 @@ error
 
 
 create_procedure :
-        K_CREATE ( K_OR K_REPLACE )? (K_PROCEDURE | K_FUNCTION) object_name
+        K_CREATE ( K_OR K_REPLACE )? (K_PROCEDURE | K_FUNCTION) functionname=object_name
         parameter_declarations? (K_RETURN datatype)?
         ( K_IS | K_AS )
         declare_section? body
@@ -97,7 +97,7 @@ procedure_or_function_declaration :
     ;
 
 procedure_or_function_definition :
-        procedure_or_function_declaration
+       (K_PROCEDURE | K_FUNCTION) functionname=any_name parameter_declarations? (K_RETURN datatype)? ( K_DETERMINISTIC | K_PIPELINED | K_PARALLEL_ENABLE | K_RESULT_CACHE )*
         ( K_IS | K_AS ) declare_section? body
 	;
 
@@ -306,7 +306,7 @@ dynamic_returning_clause :
 
 for_loop_statement :
 
-        K_FOR loopvar=any_name K_IN ( lb=expr '.' '.' rb=expr | cursorname=object_name | '(' ss=select_stmt ')' ) K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
+        K_FOR loopvar=any_name K_IN ( lb=expr '.' '.' rb=expr | '(' ss=select_stmt ')' | cursorcall=expr ) K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
 //forall_statement :

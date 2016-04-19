@@ -1085,47 +1085,96 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         nameResolver.startBlock(ctx);
         String loopVarName = ctx.loopvar.getText();
-        VariableDefinition vd = new VariableDefinition();
-        vd.setName(loopVarName);
-        nameResolver.defineVariable(vd);
+        VariableDefinition loopVar = new VariableDefinition();
+        loopVar.setName(loopVarName);
+        nameResolver.defineVariable(loopVar);
 
-        // TODO Auto-generated method stub
-        /*
+        labelRecorder.enterLoop();
+        PatchList forBlock = new PatchList();
+        PatchList loopBody;
+        Instruction startOfLoop;
+        if (ctx.lb != null) {/*
         for i in lowerbound..upperbound   -->
         branchCond(lowerbound + upperbond)
-        loop stmts nop(branch) endloop;
+        loop stmts  endloop;
          */
-
-        /*
+            StateFunc bounds = StateFunc.combine(funcOfExpr(ctx.lb.accept(this)), funcOfExpr(ctx.rb.accept(this)));
+            Instruction boundsInstruction = new Instruction(InstFuncHelper.branchCondFunc(bounds),
+                    CollectDebugInfo(ctx.getClass().getName(), bounds), nameResolver.getCurrentScopeInfo());
+            instbuffer.add(boundsInstruction);
+            loopBody = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+            boundsInstruction.addNextInstruction(loopBody.getStartInstruction());
+            startOfLoop = loopBody.getStartInstruction();
+            forBlock.setStartInstruction(boundsInstruction);
+        } else {
+            SelectStmtData ss;
+            if (ctx.ss != null) {
+                /*
         for i in select stmt   -->
         loop; select ss into i; stmts; endloop
         */
-
-        /*
+                ss = (SelectStmtData) ctx.ss.accept(this);
+            } else {
+ /*
         for i in cursor   -->
-        open cursor x; loop; fetch x into i; stmts; endloop
+        convert x to select stmt then  for i in select stmt...
+        open cursor x; loop; fetch x into i; stmts; endloop; close cursor x
         */
 
+                ExprContext expr = ctx.cursorcall;
+                if (expr instanceof ExprObjectContext) {
+                    // no args
+                    CursorDefinition cursorDefinition = nameResolver.searchCursor(expr.getText());
+                    ss = cursorDefinition.getSelectStmt();
+                } else {
+                    // args present
+                    ExprFunctionContext cursorCall = (ExprFunctionContext) expr;
+                    CursorDefinition cursorDefinition = nameResolver.searchCursor(cursorCall.function_name().getText());
+                    SelectStmtData selectWithoutParams = cursorDefinition.getSelectStmt();
 
-        labelRecorder.enterLoop();
-        PatchList loopBody = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
-        Instruction startOfLoop = loopBody.getStartInstruction();
+                    // apply parameters to select stmt
+                    Preconditions.checkState(cursorDefinition.getParameters().size() == cursorCall.ex.size(), "cursor %s parameter size mismatch", cursorDefinition.getName());
+                    List<ResultColumn> newrs = new ArrayList<>();
+                    Map<ObjectDefinition, StateFunc> pvs = new HashMap<>();
+                    for (int i = 0; i < cursorDefinition.getParameters().size(); ++i) {
+                        StateFunc fn = funcOfExpr(cursorCall.ex.get(i).accept(this));
+                        pvs.put(cursorDefinition.getParameters().get(i), fn);
+                    }
+
+                    for (ResultColumn rc : selectWithoutParams.getColumns()) {
+                        newrs.add(new ResultColumn(rc.getName(), rc.getPosition(), rc.getExpr().applyDefinition(pvs)));
+                    }
+                    ss = new SelectStmtData(newrs);
+
+                }
+            }
+            ss.setIntos(Collections.singletonList(loopVar));
+            Instruction loopVarUpdateInstruction = new Instruction(InstFuncHelper.selectFunc(ss),
+                    CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), ss), nameResolver.getCurrentScopeInfo());
+            instbuffer.add(loopVarUpdateInstruction);
+            loopBody = (PatchList) ctx.multiple_plsql_stmt_list().accept(this);
+            loopVarUpdateInstruction.addNextInstruction(loopBody.getStartInstruction());
+            startOfLoop = loopVarUpdateInstruction;
+            forBlock.setStartInstruction(loopVarUpdateInstruction);
+
+        }
+
         // goto start of loop
         for (Instruction instructionToPatch : loopBody.getNextList()) {
             instructionToPatch.addNextInstruction(startOfLoop);
         }
-        PatchList p = new PatchList();
-        p.setStartInstruction(startOfLoop);
+        // loop end condition will resolve to NOP.
+        forBlock.getNextList().addAll(loopBody.getNextList());
 
         // break = goto "nextlist"
-        p.getNextList().addAll(labelRecorder.getCurrentBreaks());
+        forBlock.getNextList().addAll(labelRecorder.getCurrentBreaks());
         // continue = goto "start of loop"
         labelRecorder.getCurrentContinues().forEach(i -> i.addNextInstruction(startOfLoop));
         // labelel breaks and continues
         if (ctx.label_name() != null) {
             String label = ctx.label_name().getText();
             // TODO if duplicate label?
-            Optional.ofNullable(labelRecorder.getBreakLabels().remove(label)).ifPresent(p.getNextList()::addAll);
+            Optional.ofNullable(labelRecorder.getBreakLabels().remove(label)).ifPresent(forBlock.getNextList()::addAll);
             Optional.ofNullable(labelRecorder.getContinueLabels().remove(label))
                     .ifPresent(list -> list.forEach(i -> i.addNextInstruction(startOfLoop)));
         }
@@ -1144,7 +1193,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 		 */
 
         FunctionDefinition functionDefinition = new FunctionDefinition();
-        functionDefinition.setName(ctx.object_name().getText());
+        functionDefinition.setName(ctx.functionname.getText());
         List<ParameterDefinition> parameterDefinitions = Collections.emptyList();
         if (ctx.parameter_declarations() != null) {
             parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations().accept(this);
@@ -1166,10 +1215,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             if (pd.isOut()) {
                 VariableDefinition vd = new VariableDefinition();
                 vd.setName(pd.getName());
+                pd.setFunctionBodyVariable(vd);
                 nameResolver.defineVariable(vd);
                 if (pd.isIn()) {
                     instSeq.add(instbuffer.add(new Instruction(InstFuncHelper.assignExpression(vd, new ExprAnalyzeResult(pd)),
-                            "INIT OUT PARAM " + pd.getName(), bodyctx)));
+                            "INIT OUT PARAM " + pd.getName(), nameResolver.getCurrentScopeInfo())));
                     // TODO parameter default value text.
                 }
             }
@@ -1188,16 +1238,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         }
 
-        // TODO what to do with end of program?
-        /*
-        Instruction programEnd = new Instruction(Function.identity(), "END OF FUNCTION", bodyctx);
-        programEnd.setId(-1);
-
-        instSeq.get(instSeq.size() - 1).getNextList().forEach(i -> i.addNextInstruction(programEnd));
-        */
+        if (ctx.K_PROCEDURE() != null) {
+            Instruction endprocedure = new Instruction(InstFuncHelper.returnStmtFunc(null), "END OF PROCEDURE", nameResolver.getCurrentScopeInfo());
+            instbuffer.add(endprocedure);
+            instSeq.get(instSeq.size() - 1).getNextList().forEach(i -> i.addNextInstruction(endprocedure));
+        }
         nameResolver.endBlock(bodyctx);
+        instbuffer.exitFunctionDef(nameResolver.getCurrentScopeInfo());
         nameResolver.exitFunctionDefinition(ctx);
-        instbuffer.exitFunctionDef();
+
+        nameResolver.defineFunction(functionDefinition);
         return null;
 
     }
@@ -1252,7 +1302,63 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
     @Override
     public FunctionDefinition visitProcedure_or_function_definition(Procedure_or_function_definitionContext ctx) {
-        // TODO Auto-generated method stub
+        // IDENTICAL TO visitCreateProcedure !!!!!!!!!!!!!!!!!!!!
+        FunctionDefinition functionDefinition = new FunctionDefinition();
+        functionDefinition.setName(ctx.functionname.getText());
+        List<ParameterDefinition> parameterDefinitions = Collections.emptyList();
+        if (ctx.parameter_declarations() != null) {
+            parameterDefinitions = (List<ParameterDefinition>) ctx.parameter_declarations().accept(this);
+        }
+        functionDefinition.setParameters(parameterDefinitions);
+        nameResolver.enterFunctionDefinition(ctx);
+        instbuffer.enterFunctionDef(functionDefinition);
+        parameterDefinitions.forEach(nameResolver::defineVariable);
+
+        // for each out param create a same-name variable for it
+        // for in out parameter put an assign . otherwise null;
+
+        BodyContext bodyctx = ctx.body();
+        nameResolver.startBlock(bodyctx);
+
+        List<PatchList> instSeq = new ArrayList<>();
+
+        for (ParameterDefinition pd : parameterDefinitions) {
+            if (pd.isOut()) {
+                VariableDefinition vd = new VariableDefinition();
+                vd.setName(pd.getName());
+                pd.setFunctionBodyVariable(vd);
+                nameResolver.defineVariable(vd);
+                if (pd.isIn()) {
+                    instSeq.add(instbuffer.add(new Instruction(InstFuncHelper.assignExpression(vd, new ExprAnalyzeResult(pd)),
+                            "INIT OUT PARAM " + pd.getName(), nameResolver.getCurrentScopeInfo())));
+                    // TODO parameter default value text.
+                }
+            }
+        }
+
+        if (ctx.declare_section() != null) {
+            instSeq.addAll((List<PatchList>) ctx.declare_section().accept(this));
+        }
+
+        instSeq.add((PatchList) ctx.body().accept(this));
+
+        for (int i = 0; i < instSeq.size() - 1; ++i) {
+            for (Instruction inst : instSeq.get(i).getNextList()) {
+                inst.addNextInstruction(instSeq.get(i + 1).getStartInstruction());
+            }
+
+        }
+
+        if (ctx.K_PROCEDURE() != null) {
+            Instruction endprocedure = new Instruction(InstFuncHelper.returnStmtFunc(null), "END OF PROCEDURE", nameResolver.getCurrentScopeInfo());
+            instbuffer.add(endprocedure);
+            instSeq.get(instSeq.size() - 1).getNextList().forEach(i -> i.addNextInstruction(endprocedure));
+        }
+        nameResolver.endBlock(bodyctx);
+        instbuffer.exitFunctionDef(nameResolver.getCurrentScopeInfo());
+        nameResolver.exitFunctionDefinition(ctx);
+
+        nameResolver.defineFunction(functionDefinition);
         return null;
     }
 
@@ -1431,16 +1537,27 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         nameResolver.startBlock("ROOTBLOCK");
         visitChildren(ctx);
         nameResolver.endBlock("ROOTBLOCK");
+
+        instbuffer.exitFunctionDef(nameResolver.getCurrentScopeInfo());
         nameResolver.exitFunctionDefinition("ROOT");
-        instbuffer.exitFunctionDef();
         return null;
 
     }
 
     @Override
-    public Object visitReturn_statement(Return_statementContext ctx) {
-        // TODO implement it
-        return null;
+    public PatchList visitReturn_statement(Return_statementContext ctx) {
+        StateFunc returnValue = null;
+        if (ctx.expr() != null) {
+            returnValue = funcOfExpr(ctx.expr().accept(this));
+        }
+        PatchList p = new PatchList();
+        Instruction ret = new Instruction(InstFuncHelper.returnStmtFunc(returnValue),
+                CollectDebugInfo("RETURN @" + ctx.getStart().getLine(), returnValue == null ? "" : returnValue),
+                nameResolver.getCurrentScopeInfo());
+        instbuffer.add(ret);
+        p.setStartInstruction(ret);
+        // not next instruction
+        return p;
     }
 
 }

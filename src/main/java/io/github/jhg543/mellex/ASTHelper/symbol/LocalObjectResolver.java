@@ -20,12 +20,16 @@ public class LocalObjectResolver {
     private LinkedList<Scope> scopes = new LinkedList<>();
 
     public VariableDefinition searchVariable(String name) {
+        return searchVariableInScope(name, scopes.peek());
+    }
+
+    private static VariableDefinition searchVariableInScope(String name, Scope s) {
 
         List<String> namedotsplit = dotsplitter.splitToList(name);
         if (namedotsplit.size() == 1) {
-            return searchVariableBySimpleName(name);
+            return searchVariableBySimpleName(name, s);
         } else if (namedotsplit.size() == 2) {
-            VariableDefinition d = searchVariableBySimpleName(namedotsplit.get(0));
+            VariableDefinition d = searchVariableBySimpleName(namedotsplit.get(0), s);
             if (d == null) {
                 return null;
             }
@@ -57,17 +61,15 @@ public class LocalObjectResolver {
         return null;
     }
 
-    private VariableDefinition searchVariableBySimpleName(String name) {
+    private static VariableDefinition searchVariableBySimpleName(String name, Scope s) {
         // assume no "." in name
-        for (Scope s : scopes) {
+        while (s != null) {
             Map<String, VariableDefinition> m = s.getVariables();
             VariableDefinition d = m.get(name);
             if (d != null) {
                 return d;
             }
-            if (s.getParentScope() == null) {
-                return null;
-            }
+            s = s.getParentScope();
         }
         return null;
     }
@@ -101,8 +103,19 @@ public class LocalObjectResolver {
         this.scopes.push(s);
     }
 
-    public Scope getCurrentScopeInfo() {
-        return this.scopes.peek();
+    private LocalObjectStatusSnapshot localObjectStatusSnapshot = new LocalObjectStatusSnapshot(null);
+
+    public LocalObjectStatusSnapshot getCurrentScopeSnapshot() {
+        // TODO I am lazy to implement the full copy of state
+        if (localObjectStatusSnapshot.getScope() != this.scopes.peek()) {
+            localObjectStatusSnapshot = new LocalObjectStatusSnapshot(this.scopes.peek());
+        }
+        return localObjectStatusSnapshot;
+    }
+
+    public static boolean isVariableLive(VariableDefinition variableDefinition, LocalObjectStatusSnapshot shot)
+    {
+        return searchVariableInScope(variableDefinition.getName(),shot.getScope())==variableDefinition;
     }
 
     public void popScope(Object expectedScopeId) {
@@ -117,6 +130,10 @@ public class LocalObjectResolver {
         Preconditions.checkState(this.scopes.peek().getCursors().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
     }
 
+    public void addFunctionDefinition(FunctionDefinition def) {
+        Preconditions.checkState(this.scopes.peek().getFunctions().put(def.getName(), def) == null, "duplicate object name %s", def.getName());
+    }
+
     public static class Scope {
         Object id;
         Map<String, VariableDefinition> variables;
@@ -124,7 +141,8 @@ public class LocalObjectResolver {
         Map<String, CursorDefinition> cursors;
         Scope parentScope;
 
-        private Scope(){}
+        private Scope() {
+        }
 
         public Object getId() {
             return id;

@@ -237,4 +237,21 @@ public class InstFuncHelper {
     public static Function<State, State> OpenCursorFuncDynamic(CursorDefinition def, VariableDefinition dynamicSQL) {
         throw new UnsupportedOperationException("dynamic cursor not implemented");
     }
+
+    public static Function<State, State> returnStmtFunc(StateFunc valueExpr) {
+
+        Function<State, State> fff = (State s) -> {
+            State ns = s.copy();
+
+            if (valueExpr != null) {
+                StateFunc fn = applyState(valueExpr, s);
+                metFn(fn, ns);
+                ns.getFuncState().addReturnValue(fn);
+            }
+
+            ns.getFuncState().collectOutParameterAssign(s);
+            return ns;
+        };
+        return fff;
+    }
 }

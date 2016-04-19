@@ -44,6 +44,9 @@ public class NameResolver {
 			ors.collectResultColumnAlias(aliasList);
 		}
 	}
+	public void defineFunction(FunctionDefinition def) {
+		local.addFunctionDefinition(def);
+	}
 
 	public void defineVariable(VariableDefinition def) {
 		local.addVariableDefinition(def);
@@ -58,7 +61,7 @@ public class NameResolver {
 	}
 
 	public void enterFunctionDefinition(Object funcid) {
-		local.pushScope(funcid, false);
+		local.pushScope(funcid, true);
 	}
 
 	public void enterCursorDefinition(Object scopeId) {
@@ -179,8 +182,8 @@ public class NameResolver {
 		return null;
 	}
 
-	public Object getCurrentScopeInfo() {
-		return local.getCurrentScopeInfo();
+	public LocalObjectStatusSnapshot getCurrentScopeInfo() {
+		return local.getCurrentScopeSnapshot();
 	}
 
 	/**
