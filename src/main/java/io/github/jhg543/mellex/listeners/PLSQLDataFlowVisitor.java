@@ -1560,6 +1560,16 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         return p;
     }
 
+    @Override
+    public Object visitExecute_immediate_statement(Execute_immediate_statementContext ctx) {
+        // TODO complete using clause
+        ExprAnalyzeResult expr = (ExprAnalyzeResult)ctx.expr().accept(this);
+        if (expr.getLiteralValue()==null ||expr.getLiteralValue().size()==0)
+        {
+            throw new IllegalStateException("Can not infer content of " + ctx.expr().getText());
+        }
+        return super.visitExecute_immediate_statement(ctx);
+    }
 }
 
 /*

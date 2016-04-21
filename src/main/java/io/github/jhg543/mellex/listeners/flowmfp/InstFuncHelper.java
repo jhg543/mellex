@@ -2,12 +2,15 @@ package io.github.jhg543.mellex.listeners.flowmfp;
 
 import com.google.common.base.Preconditions;
 import io.github.jhg543.mellex.ASTHelper.plsql.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class InstFuncHelper {
+    private static final Logger log = LoggerFactory.getLogger(InstFuncHelper.class);
 
     private static StateFunc applyState(StateFunc fn, State s) {
         // TODO what if varstate has R?
@@ -29,7 +32,7 @@ public class InstFuncHelper {
                 }
                 if (v.getPossibleLiteralValue() == null) {
                     // TODO ???????
-                    result.add(v.getValueInfluence());
+                    result.add(o);
                 } else {
                     // TODO what if add to self?
                     result.addAll(v.getPossibleLiteralValue());
@@ -250,6 +253,18 @@ public class InstFuncHelper {
             }
 
             ns.getFuncState().collectOutParameterAssign(s);
+            return ns;
+        };
+        return fff;
+    }
+
+    public static Function<State, State> execDynamicFunc(List<Object> literal) {
+
+        Function<State, State> fff = (State s) -> {
+            State ns = s.copy();
+            // TODO this is a debug stub;
+            List<Object> currentLiteralState = applyPossibleLiteralValue(literal,s);
+            System.out.println(DynamicSqlHelper.literalsToString(currentLiteralState));
             return ns;
         };
         return fff;
