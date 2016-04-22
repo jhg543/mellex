@@ -7,19 +7,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PseudoColumnResolver {
-	//TODO implement this.
-	
-	private Map<String,StateFunc> globalcs;
-	
-	public PseudoColumnResolver(DatabaseVendor vendor)
-	{
-		globalcs= new HashMap<>();
-		globalcs.put("TRUE", StateFunc.of());
-		globalcs.put("FALSE", StateFunc.of());
-		globalcs.put("ROWNUM", StateFunc.of());
-	}
-	public StateFunc searchByName(String name)
-	{
-		return globalcs.get(name);
-	}
+    //TODO implement this.
+
+    private Map<String, StateFunc> globalcs;
+
+    public PseudoColumnResolver(DatabaseVendor vendor) {
+        globalcs = new HashMap<>();
+        globalcs.put("TRUE", StateFunc.of());
+        globalcs.put("FALSE", StateFunc.of());
+        globalcs.put("ROWNUM", StateFunc.of());
+    }
+
+    public StateFunc searchByName(String name) {
+        if (name.endsWith(".NEXTVAL"))
+        {
+            return StateFunc.of();
+        }
+        return globalcs.get(name);
+    }
 }

@@ -28,9 +28,10 @@ public class InstFuncHelper {
             } else if (o instanceof VariableDefinition) {
                 VariableState v = s.readVarState().get(o);
                 if (v == null) {
-                    throw new IllegalStateException(o.toString() + " not found in state");
-                }
-                if (v.getPossibleLiteralValue() == null) {
+                    result.add(o);
+                    // this var is from outside or is a parameter
+                    //throw new IllegalStateException(o.toString() + " not found in state");
+                } else if (v.getPossibleLiteralValue() == null) {
                     // TODO ???????
                     result.add(o);
                 } else {
@@ -263,7 +264,7 @@ public class InstFuncHelper {
         Function<State, State> fff = (State s) -> {
             State ns = s.copy();
             // TODO this is a debug stub;
-            List<Object> currentLiteralState = applyPossibleLiteralValue(literal,s);
+            List<Object> currentLiteralState = applyPossibleLiteralValue(literal, s);
             System.out.println(DynamicSqlHelper.literalsToString(currentLiteralState));
             return ns;
         };

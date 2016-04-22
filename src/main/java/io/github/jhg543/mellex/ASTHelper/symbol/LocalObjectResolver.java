@@ -5,6 +5,7 @@ import com.google.common.base.Splitter;
 import io.github.jhg543.mellex.ASTHelper.plsql.CursorDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.FunctionDefinition;
 import io.github.jhg543.mellex.ASTHelper.plsql.VariableDefinition;
+import io.github.jhg543.mellex.listeners.flowmfp.DynamicSqlHelper;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -24,7 +25,7 @@ public class LocalObjectResolver {
     }
 
     private static VariableDefinition searchVariableInScope(String name, Scope s) {
-
+        name = DynamicSqlHelper.removeDynamicVarHeader(name);
         List<String> namedotsplit = dotsplitter.splitToList(name);
         if (namedotsplit.size() == 1) {
             return searchVariableBySimpleName(name, s);

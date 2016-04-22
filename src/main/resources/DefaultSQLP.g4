@@ -611,7 +611,7 @@ returns [ InsertStmt stmt = new InsertStmt() ]
                 | K_INSERT K_OR K_ABORT
                 | K_INSERT K_OR K_FAIL
                 | K_INSERT K_OR K_IGNORE ) K_INTO?
-   obj = object_name alias = any_name
+   obj = object_name (alias = any_name)?
    //( database_name '.' )? table_name
    ( '(' cn+=column_name ( ',' cn+=column_name )* ')' )?
    ( K_VALUES '(' ex+=expr ( ',' ex+=expr )* ')'  | ss=select_stmt  )
@@ -1147,7 +1147,7 @@ keyword
  | K_INSERT
  | K_INSTEAD
  | K_INTERSECT
- | K_INTO
+// | K_INTO
  | K_IS
  | K_ISNULL
  | K_JOIN
@@ -1313,6 +1313,7 @@ any_name
 swallow_to_semi :
         ~( ';' )+
     ;
+
 
 
 SCOL : ';';

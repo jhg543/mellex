@@ -341,15 +341,24 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         ExprAnalyzeResult e1 = (ExprAnalyzeResult) ctx.operand1.accept(this);
         ExprAnalyzeResult e2 = (ExprAnalyzeResult) ctx.operand2.accept(this);
 
-        if (!e1.getLiteralValue().isEmpty() && !e2.getLiteralValue().isEmpty()) {
-            List<Object> literalValue = null;
-            literalValue = new LinkedList<>();
-            literalValue.addAll(e1.getLiteralValue());
-            literalValue.addAll(e2.getLiteralValue());
-            return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()), literalValue);
+        List<Object> lit1;
+        List<Object> lit2;
+        if (e1.getLiteralValue().isEmpty()) {
+            lit1 = Collections.singletonList(DynamicSqlHelper.NON_PARSABLE_FUNC_OR_EXPR);
         } else {
-            return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()));
+            lit1 = e1.getLiteralValue();
         }
+
+        if (e2.getLiteralValue().isEmpty()) {
+            lit2 = Collections.singletonList(DynamicSqlHelper.NON_PARSABLE_FUNC_OR_EXPR);
+        } else {
+            lit2 = e2.getLiteralValue();
+        }
+
+        List<Object> literalValue = new LinkedList<>();
+        literalValue.addAll(lit1);
+        literalValue.addAll(lit2);
+        return new ExprAnalyzeResult(StateFunc.combine(e1.getTransformation(), e2.getTransformation()), literalValue);
 
     }
 
@@ -607,7 +616,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         ss.getColumns().forEach(rc -> rc.setExpr(rc.getExpr().addWhereClause(combinedClause)));
 
         if (ctx.v.size() > 0) {
-            List<VariableDefinition> intos = ctx.v.stream().map(vctx -> (VariableDefinition)vctx.accept(PLSQLDataFlowVisitor.this))
+            List<VariableDefinition> intos = ctx.v.stream().map(vctx -> (VariableDefinition) vctx.accept(PLSQLDataFlowVisitor.this))
                     .collect(Collectors.toList());
             ss.setIntos(intos);
         }
@@ -1098,7 +1107,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitFor_loop_statement(For_loop_statementContext ctx) {
+    public PatchList visitFor_loop_statement(For_loop_statementContext ctx) {
 
         nameResolver.startBlock(ctx);
         String loopVarName = ctx.loopvar.getText();
@@ -1199,7 +1208,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         labelRecorder.exitLoop();
 
         nameResolver.endBlock(ctx);
-        return super.visitFor_loop_statement(ctx);
+        return forBlock;
     }
 
     @Override
@@ -1584,7 +1593,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         if (expr.getLiteralValue() == null || expr.getLiteralValue().size() == 0) {
             throw new IllegalStateException("Can not infer content of " + ctx.expr().getText());
         }
-        return super.visitExecute_immediate_statement(ctx);
+        return instbuffer.add(new Instruction(InstFuncHelper.execDynamicFunc(expr.getLiteralValue()),
+                CollectDebugInfo("EXECSQL @" + ctx.getStart().getLine(), expr.getLiteralValue()),
+                nameResolver.getCurrentScopeInfo()));
     }
 }
 
