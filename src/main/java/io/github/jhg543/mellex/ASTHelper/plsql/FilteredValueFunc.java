@@ -1,6 +1,5 @@
 package io.github.jhg543.mellex.ASTHelper.plsql;
 
-import java.util.Arrays;
 import java.util.List;
 
 public class FilteredValueFunc {
@@ -48,4 +47,11 @@ public class FilteredValueFunc {
 		return new FilteredValueFunc(newv, newf);
 	}
 
+	@Override
+	public String toString() {
+		return "FV{" +
+				"v=" + value +
+				", f=" + filter +
+				'}';
+	}
 }

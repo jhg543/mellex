@@ -108,7 +108,7 @@ public class ValueFunc {
 
 		return builder.Build();
 	}
-	
+
 	public ValueFunc add(ValueFunc... others)
 	{
 		ValueFunc.Builder builder = new ValueFunc.Builder();
@@ -119,7 +119,7 @@ public class ValueFunc {
 		return builder.Build();
 	}
 
-	
+
 	@Override
 	public String toString() {
 		return "V [" + (objects.isEmpty() ? "" : ("obj=" + objects)) + (parameters.isEmpty() ? "" : (" param=" + parameters))

@@ -1,10 +1,10 @@
 package io.github.jhg543.mellex.ASTHelper.symbol;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import io.github.jhg543.mellex.ASTHelper.plsql.StateFunc;
 import io.github.jhg543.mellex.util.DatabaseVendor;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class PseudoColumnResolver {
 	//TODO implement this.
@@ -16,6 +16,7 @@ public class PseudoColumnResolver {
 		globalcs= new HashMap<>();
 		globalcs.put("TRUE", StateFunc.of());
 		globalcs.put("FALSE", StateFunc.of());
+		globalcs.put("ROWNUM", StateFunc.of());
 	}
 	public StateFunc searchByName(String name)
 	{

@@ -607,13 +607,13 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         ss.getColumns().forEach(rc -> rc.setExpr(rc.getExpr().addWhereClause(combinedClause)));
 
         if (ctx.v.size() > 0) {
-            List<VariableDefinition> intos = ctx.v.stream().map(vctx -> nameResolver.searchVariable(vctx.getText()))
+            List<VariableDefinition> intos = ctx.v.stream().map(vctx -> (VariableDefinition)vctx.accept(PLSQLDataFlowVisitor.this))
                     .collect(Collectors.toList());
             ss.setIntos(intos);
         }
         return ss;
 
-        // TODO implement "INTO" clause
+
     }
 
     @Override
@@ -769,7 +769,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         nameResolver.exitSelectStmt(ctx);
 
         return instbuffer.add(new Instruction(InstFuncHelper.insertOrUpdateFunc(cdefs, exprs),
-                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cdefs, exprs),
+                CollectDebugInfo("UPDATE @" + ctx.getStart().getLine(), cdefs, exprs),
                 nameResolver.getCurrentScopeInfo()));
 
     }
@@ -826,15 +826,32 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     }
 
     @Override
-    public PatchList visitAssign_statement(Assign_statementContext ctx) {
-        if (!(ctx.lvalue instanceof ExprObjectContext)) {
-            throw new IllegalStateException(String.format("%s cannot be assigned", ctx.lvalue.getText()));
+    public VariableDefinition visitAssignableValue(AssignableValueContext ctx) {
+        String varname = ctx.object_name().getText();
+        ExprContext expr = ctx.expr();
+        if (expr != null) {
+            if (expr instanceof ExprLiteralContext) {
+                varname = varname + '.' + expr.getText();
+            } else {
+                //TODO dynamic column access it not supported
+            }
         }
-        VariableDefinition lvalue = (VariableDefinition) funcOfExpr(ctx.lvalue.accept(this)).getValue().getParameters()
-                .iterator().next();
+
+        VariableDefinition vd = nameResolver.searchVariable(varname);
+        if (vd == null) {
+            throw new IllegalStateException("Var " + varname + "not found");
+        }
+        //TODO recursive record dereference    V.a(5).b(3)....
+        return vd;
+    }
+
+    @Override
+    public PatchList visitAssign_statement(Assign_statementContext ctx) {
+
+        VariableDefinition lvalue = (VariableDefinition) ctx.lvalue.accept(this);
         ExprAnalyzeResult rvalue = (ExprAnalyzeResult) ctx.rvalue.accept(this);
         return instbuffer.add(new Instruction(InstFuncHelper.assignExpression(lvalue, rvalue),
-                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), lvalue, rvalue),
+                CollectDebugInfo("ASSIGN @" + ctx.getStart().getLine(), lvalue, rvalue),
                 nameResolver.getCurrentScopeInfo()));
     }
 
@@ -849,7 +866,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     public PatchList visitCall_statement(Call_statementContext ctx) {
         StateFunc fn = funcOfExpr(ctx.expr().accept(this));
         return instbuffer.add(new Instruction(InstFuncHelper.callExpression(fn),
-                CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeInfo()));
+                CollectDebugInfo("CALL @" + ctx.getStart().getLine(), fn), nameResolver.getCurrentScopeInfo()));
 
     }
 
@@ -1563,9 +1580,8 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
     @Override
     public Object visitExecute_immediate_statement(Execute_immediate_statementContext ctx) {
         // TODO complete using clause
-        ExprAnalyzeResult expr = (ExprAnalyzeResult)ctx.expr().accept(this);
-        if (expr.getLiteralValue()==null ||expr.getLiteralValue().size()==0)
-        {
+        ExprAnalyzeResult expr = (ExprAnalyzeResult) ctx.expr().accept(this);
+        if (expr.getLiteralValue() == null || expr.getLiteralValue().size() == 0) {
             throw new IllegalStateException("Can not infer content of " + ctx.expr().getText());
         }
         return super.visitExecute_immediate_statement(ctx);

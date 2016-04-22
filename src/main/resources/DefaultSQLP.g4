@@ -180,7 +180,7 @@ ref_cursor_type_definition
 	;
 
 datatype
-    : ( K_REF )? any_name ( '.' any_name )? ( '(' NUMERIC_LITERAL ( ',' NUMERIC_LITERAL )* ')' | '%' ( K_TYPE | K_ROWTYPE ) )?
+    : ( K_REF )? object_name ( '(' NUMERIC_LITERAL ( ',' NUMERIC_LITERAL )* ')' | '%' ( K_TYPE | K_ROWTYPE ) )?
     ;
 
 
@@ -237,9 +237,12 @@ delete_call
     : K_DELETE ( '(' parameter? ')' )?
     ;
 */
+assignableValue:
+    object_name ('(' expr ')')?
+;
 
 assign_statement:
-    lvalue=expr ':=' rvalue=expr
+    lvalue=assignableValue ':=' rvalue=expr
 ;
 
 call_statement:
@@ -306,7 +309,7 @@ dynamic_returning_clause :
 
 for_loop_statement :
 
-        K_FOR loopvar=any_name K_IN ( lb=expr '.' '.' rb=expr | '(' ss=select_stmt ')' | cursorcall=expr ) K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
+        K_FOR loopvar=any_name K_IN ( lb=expr '..' rb=expr | '(' ss=select_stmt ')' | cursorcall=expr ) K_LOOP multiple_plsql_stmt_list K_END K_LOOP label_name?
     ;
 
 //forall_statement :
@@ -608,7 +611,7 @@ returns [ InsertStmt stmt = new InsertStmt() ]
                 | K_INSERT K_OR K_ABORT
                 | K_INSERT K_OR K_FAIL
                 | K_INSERT K_OR K_IGNORE ) K_INTO?
-   obj = object_name
+   obj = object_name alias = any_name
    //( database_name '.' )? table_name
    ( '(' cn+=column_name ( ',' cn+=column_name )* ')' )?
    ( K_VALUES '(' ex+=expr ( ',' ex+=expr )* ')'  | ss=select_stmt  )
@@ -958,7 +961,7 @@ returns [ SubQuery q ]
 //locals [ List<SubQuery> tables, List<Integer> groupbypositions = new ArrayList<>()  ]
  : ( K_SELECT | K_SEL ) ( K_UNIQUE /* WTF */ | K_DISTINCT | K_ALL | K_TOP NUMERIC_LITERAL K_PERCENT? (K_WITH K_TIES)? )?
     r+=result_column  ( ',' r+=result_column  )*
-   ( K_INTO v+=variable_name ( ',' v+=variable_name)* )? /* PL/SQL SELECT INTO */
+   ( K_INTO v+=assignableValue ( ',' v+=assignableValue)* )? /* PL/SQL SELECT INTO */
    ( K_FROM jc=join_clause )?
    ( g1=grouping_by_clause )? /* WTF */
    ( w1=where_clause )?
@@ -1091,7 +1094,7 @@ keyword
  | K_ATTACH
  | K_AUTOINCREMENT
  | K_BEFORE
- | K_BEGIN
+// | K_BEGIN
  | K_BETWEEN
  | K_BY
  | K_CASCADE
@@ -1119,7 +1122,7 @@ keyword
  | K_DROP
  | K_EACH
 // | K_ELSE
- | K_END
+// | K_END
  | K_ESCAPE
  | K_EXCEPT
  | K_EXCLUSIVE
@@ -1576,9 +1579,10 @@ MACROVAR
  ;
 
 NUMERIC_LITERAL
- : DIGIT+ ( '.' DIGIT* )? ( E [-+]? DIGIT+ )?
+ : DIGIT+ ( '.' DIGIT+ )? ( E [-+]? DIGIT+ )?
  | '.' DIGIT+ ( E [-+]? DIGIT+ )?
  ;
+
 
 /*
 BIND_PARAMETER

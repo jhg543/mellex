@@ -20,6 +20,15 @@ public class DebugMain {
 	private boolean guessEnabled;
 	private String sql;
 
+	public static String GetSql(String pkgpath,String inputfile) {
+		try {
+			Path f = (new File(DebugMain.class.getClassLoader().getResource(pkgpath + inputfile).toURI())).toPath();
+			return Misc.trimPerlScript(f).toUpperCase();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	public static String GetSql(String inputfile) {
 		try {
 			Path f = (new File(DebugMain.class.getClassLoader().getResource("test/z01/sql/" + inputfile).toURI())).toPath();
@@ -27,7 +36,6 @@ public class DebugMain {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
 	}
 
 	private InstBuffer generateInst(String sql) {
@@ -70,7 +78,7 @@ public class DebugMain {
 	public static void main(String[] args) throws Exception {
 
 		//DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("p001.sql"));
-		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, false, GetSql("p005.sql"));
+		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, true, GetSql("test/z01/sql2/","p002.sql"));
 		d.run();
 	}
 }
