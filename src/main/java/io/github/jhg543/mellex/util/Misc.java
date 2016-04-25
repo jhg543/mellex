@@ -1,5 +1,10 @@
 package io.github.jhg543.mellex.util;
 
+import com.google.common.base.Splitter;
+import io.github.jhg543.mellex.ASTHelper.ObjectName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -7,13 +12,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Splitter;
-
-import io.github.jhg543.mellex.ASTHelper.ObjectName;
 
 public class Misc {
 	private static final Logger log = LoggerFactory.getLogger(Misc.class);
@@ -70,10 +68,10 @@ public class Misc {
 		return false;
 	}
 
-	public static String trimPerlScript(Path x) {
+	public static String trimPerlScript(Path x,Charset encoding) {
 		try {
 			// TODO detect encoding
-			String sqlscript = new String(Files.readAllBytes(x), Charset.forName("GBK"));
+			String sqlscript = new String(Files.readAllBytes(x), encoding);
 			if (x.getFileName().toString().toLowerCase().endsWith(".sql")) {
 				return sqlscript;
 			}
@@ -100,7 +98,6 @@ public class Misc {
 					return null;
 				} else {
 					sqlscript = sqlscript.substring(a + 62, b - 1);
-					;
 				}
 
 			} else {
@@ -113,6 +110,7 @@ public class Misc {
 				String xline = line.trim();
 				if (xline.startsWith(".") || xline.startsWith("#") || xline.startsWith("${LOGON")
 						|| xline.startsWith("${v_fir_sql}") || xline.startsWith("${v_last_sql}")
+						|| xline.startsWith("prompt")
 						|| xline.startsWith("${tar_logon_str}") || xline.startsWith("\\\\")) {
 					sb.append("--");
 				}

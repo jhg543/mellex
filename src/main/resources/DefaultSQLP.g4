@@ -859,7 +859,7 @@ cast_expr
 */
 
 data_attribute
- : K_FORMAT literal_value
+ : K_FORMAT literal_value | '+'
  ;
 
 foreign_key_clause
@@ -1572,7 +1572,7 @@ IDENTIFIER
  : '"' (~'"' | '""')* '"'
  | '`' (~'`' | '``')* '`'
  | '[' ~']'* ']'
- | [a-zA-Z_\$] ( '{' [a-zA-Z_] [a-zA-Z_0-9]* '}' | [a-zA-Z_0-9\$] )* // TODO check: needs more chars in set
+ | [\u4e00-\u9fa5a-zA-Z_\$] ( '{' [\u4e00-\u9fa5a-zA-Z_] [\u4e00-\u9fa5a-zA-Z_0-9]* '}' | [\u4e00-\u9fa5a-zA-Z_0-9\$] )* // TODO check: needs more chars in set
  ;
 
 MACROVAR

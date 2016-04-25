@@ -300,29 +300,29 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         String text = ctx.getText();
         if (ctx.literal_value().STRING_LITERAL() != null) {
             text = escape_sql_literal(text);
-
+            // TODO if it is variable?
+            if (DynamicSqlHelper.isDynamicVar(text)) {
+                return doExprObject(DynamicSqlHelper.removeDynamicVarHeader(text),
+                        ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            }
         }
         return new ExprAnalyzeResult(StateFunc.of(), text);
 
     }
 
-    @Override
-    public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
-        String name = ctx.getText();
+    private ExprAnalyzeResult doExprObject(String name, int line, int charpos) {
         // TODO count(*)?
         if ("*".equals(name)) {
             return new ExprAnalyzeResult(StateFunc.of());
         }
         Tuple2<ObjectDefinition, StateFunc> dd = nameResolver.searchByName(name);
         if (dd == null) {
-            throw new IllegalStateException(String.format("Can't resolve symbol %s, pos %d %d", name, ctx.getStart().getLine(),
-                    ctx.getStart().getCharPositionInLine()));
+            throw new IllegalStateException(String.format("Can't resolve symbol %s, pos %d %d", name, line, charpos));
         }
         if (dd.getField0() != null) {
             ObjectDefinition def = dd.getField0();
             if (def instanceof ColumnDefinition) {
-                ObjectReference r = new ObjectReference(def, current_file, ctx.getStart().getLine(),
-                        ctx.getStart().getCharPositionInLine());
+                ObjectReference r = new ObjectReference(def, current_file, line, charpos);
                 return new ExprAnalyzeResult(StateFunc.ofValue(ValueFunc.ofColumnReference(r)));
             } else if (def instanceof VariableDefinition) {
                 return new ExprAnalyzeResult((VariableDefinition) def);
@@ -334,6 +334,11 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         }
 
         return new ExprAnalyzeResult(dd.getField1());
+    }
+
+    @Override
+    public ExprAnalyzeResult visitExprObject(ExprObjectContext ctx) {
+        return doExprObject(ctx.getText(), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
@@ -369,7 +374,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
     @Override
     public Tuple2<List<StateFunc>, List<Integer>> visitGrouping_by_clause(Grouping_by_clauseContext ctx) {
-        List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e)).collect(Collectors.toList());
+        List<StateFunc> exprs = ctx.ex.stream().map(e -> funcOfExpr(e.accept(PLSQLDataFlowVisitor.this))).collect(Collectors.toList());
         List<Integer> indexes = ctx.nx.stream().map(t -> Integer.valueOf(t.getText()) - 1).collect(Collectors.toList());
         return Tuple2.of(exprs, indexes);
     }
@@ -733,10 +738,12 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
         String tableName = ctx.tobj.getText();
         TableDefinition targetTableDef;
+        String alias = null;
         if (ctx.ta != null) {
-            String alias = ctx.ta.getText();
-            nameResolver.addFromTable(tableName, alias);
+            alias = ctx.ta.getText();
+
         }
+        nameResolver.addFromTable(tableName, alias);
 
         if (ctx.f != null) {
             ctx.f.accept(this);
@@ -1425,7 +1432,7 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
             if (ctx.any_name() != null) {
                 // dynamic SQL query
                 VariableDefinition dynamicSqlVariable = nameResolver.searchVariable(ctx.any_name().getText());
-                return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncDynamic(cursorDefinition, dynamicSqlVariable),
+                return instbuffer.add(new Instruction(InstFuncHelper.OpenCursorFuncDynamic(expr.getText(), dynamicSqlVariable),
                         CollectDebugInfo(ctx.getClass().getName(), ctx.getStart().getLine(), cursorDefinition, dynamicSqlVariable),
                         nameResolver.getCurrentScopeInfo()));
 

@@ -43,6 +43,32 @@ public class InstBuffer {
 
     }
 
+    public PatchList add(Instruction inst) {
+        return stack.peek().add(inst);
+    }
+
+    private static class OneFunctionBuffer {
+        private FunctionDefinition fndef;
+
+        private List<Instruction> instbuffer = new ArrayList<>();
+
+        public List<Instruction> getInstbuffer() {
+            return instbuffer;
+        }
+
+        public void setInstbuffer(List<Instruction> instbuffer) {
+            this.instbuffer = instbuffer;
+        }
+
+        public PatchList add(Instruction inst) {
+            inst.setId(instbuffer.size());
+            instbuffer.add(inst);
+            return PatchList.singleInstrution(inst);
+        }
+
+    }
+
+
     /**
      * used to debug
      *
@@ -73,35 +99,39 @@ public class InstBuffer {
                 w.write('\n');
             }
             w.append("FUNCTION DEF = ");
-            w.append(b.fndef.getDefinition().toString());
+            w.append(formatX(b.fndef.getDefinition().toString()));
 
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public PatchList add(Instruction inst) {
-        return stack.peek().add(inst);
-    }
-
-    private static class OneFunctionBuffer {
-        private FunctionDefinition fndef;
-
-        private List<Instruction> instbuffer = new ArrayList<>();
-
-        public List<Instruction> getInstbuffer() {
-            return instbuffer;
+    private static String formatX(String a)
+    {
+        StringBuilder sb = new StringBuilder();
+        int k = 0;
+        for (int i=0;i<a.length();++i)
+        {
+            sb.append(a.charAt(i));
+            if (a.charAt(i)=='[')
+            {
+                k++;
+                sb.append('\n');
+                for (int j=0;j<k;++j)
+                {
+                    sb.append("    ");
+                }
+            }
+            if (a.charAt(i)==']')
+            {
+                k--;
+                sb.append('\n');
+                for (int j=0;j<k;++j)
+                {
+                    sb.append("    ");
+                }
+            }
         }
-
-        public void setInstbuffer(List<Instruction> instbuffer) {
-            this.instbuffer = instbuffer;
-        }
-
-        public PatchList add(Instruction inst) {
-            inst.setId(instbuffer.size());
-            instbuffer.add(inst);
-            return PatchList.singleInstrution(inst);
-        }
-
+        return sb.toString();
     }
 }

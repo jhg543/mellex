@@ -1,10 +1,8 @@
 package io.github.jhg543.mellex.operation;
 
-import io.github.jhg543.mellex.ASTHelper.GlobalSettings;
-import io.github.jhg543.mellex.ASTHelper.InfSource;
-import io.github.jhg543.mellex.ASTHelper.ObjectName;
-import io.github.jhg543.mellex.ASTHelper.ResultColumn;
-import io.github.jhg543.mellex.ASTHelper.SubQuery;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import io.github.jhg543.mellex.ASTHelper.*;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLBaseListener;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLLexer;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLParser;
@@ -12,46 +10,25 @@ import io.github.jhg543.mellex.antlrparser.DefaultSQLParser.Sql_stmtContext;
 import io.github.jhg543.mellex.inputsource.BasicTableDefinitionProvider;
 import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.ColumnDataFlowListener;
-import io.github.jhg543.mellex.util.DAG;
-import io.github.jhg543.mellex.util.HalfEdge;
 import io.github.jhg543.mellex.util.Misc;
-import io.github.jhg543.mellex.util.Node;
-import io.github.jhg543.mellex.util.ZeroBasedStringIdGenerator;
-import io.github.jhg543.nyallas.graphmodel.BasicEdge;
-import io.github.jhg543.nyallas.graphmodel.BasicVertex;
-import io.github.jhg543.nyallas.graphmodel.Edge;
-import io.github.jhg543.nyallas.graphmodel.Vertex;
-import io.github.jhg543.nyallas.graphmodel.VolatileTableRemover;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Predicate;
-
-import org.antlr.v4.runtime.ANTLRInputStream;
-import org.antlr.v4.runtime.BaseErrorListener;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.RecognitionException;
-import org.antlr.v4.runtime.Recognizer;
+import io.github.jhg543.nyallas.graphmodel.*;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 public class StringEdgePrinter {
 	private static final Logger log = LoggerFactory.getLogger(StringEdgePrinter.class);
@@ -76,7 +53,7 @@ public class StringEdgePrinter {
 		try (PrintWriter err = new PrintWriter(dstdir.resolve("log").toAbsolutePath().toString(), "utf-8")) {
 
 			// trim perl code
-			String sql = Misc.trimPerlScript(srcdir);
+			String sql = Misc.trimPerlScript(srcdir, StandardCharsets.UTF_8);
 			if (sql == null) {
 				err.println("Can't extract sql from file " + srcdir.toString());
 				return ERR_NOSQL;
@@ -295,7 +272,7 @@ public class StringEdgePrinter {
 		// open global output files
 		try (PrintWriter out = new PrintWriter(dstdir.resolve("stats").toAbsolutePath().toString(), "utf-8");
 				PrintWriter cols = new PrintWriter(dstdir.resolve("cols").toAbsolutePath().toString(), "utf-8");
-				PrintWriter numbers = new PrintWriter(dstdir.resolve("number").toAbsolutePath().toString(), "utf-8");) {
+				PrintWriter numbers = new PrintWriter(dstdir.resolve("number").toAbsolutePath().toString(), "utf-8")) {
 			
 			// for each file
 			Files.walk(srcdir).filter(filefilter).sorted().forEach(path -> {

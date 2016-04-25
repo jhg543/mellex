@@ -16,6 +16,7 @@ public class PseudoColumnResolver {
         globalcs.put("TRUE", StateFunc.of());
         globalcs.put("FALSE", StateFunc.of());
         globalcs.put("ROWNUM", StateFunc.of());
+        globalcs.put("SYSDATE", StateFunc.of());
     }
 
     public StateFunc searchByName(String name) {

@@ -11,6 +11,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -23,7 +24,7 @@ public class DebugMain {
 	public static String GetSql(String pkgpath,String inputfile) {
 		try {
 			Path f = (new File(DebugMain.class.getClassLoader().getResource(pkgpath + inputfile).toURI())).toPath();
-			return Misc.trimPerlScript(f).toUpperCase();
+			return Misc.trimPerlScript(f, StandardCharsets.UTF_8).toUpperCase();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -32,7 +33,7 @@ public class DebugMain {
 	public static String GetSql(String inputfile) {
 		try {
 			Path f = (new File(DebugMain.class.getClassLoader().getResource("test/z01/sql/" + inputfile).toURI())).toPath();
-			return Misc.trimPerlScript(f).toUpperCase();
+			return Misc.trimPerlScript(f,StandardCharsets.UTF_8).toUpperCase();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -78,7 +79,7 @@ public class DebugMain {
 	public static void main(String[] args) throws Exception {
 
 		//DebugMain d = new DebugMain(DatabaseVendor.TERADATA, true, GetSql("ddl.sql") + GetSql("p001.sql"));
-		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, true, GetSql("test/z01/sql2/","p002.sql"));
+		DebugMain d = new DebugMain(DatabaseVendor.ORACLE, true, GetSql("test/z01/sql2/","p006.sql"));
 		d.run();
 	}
 }

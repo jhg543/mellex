@@ -238,8 +238,16 @@ public class InstFuncHelper {
     }
 
 
-    public static Function<State, State> OpenCursorFuncDynamic(CursorDefinition def, VariableDefinition dynamicSQL) {
-        throw new UnsupportedOperationException("dynamic cursor not implemented");
+    public static Function<State, State> OpenCursorFuncDynamic(String cursorText, VariableDefinition dynamicSQL) {
+
+        Function<State, State> fff = (State s) -> {
+            State ns = s.copy();
+            // TODO this is a debug stub;
+            List<Object> currentLiteralState = applyPossibleLiteralValue(Collections.singletonList(dynamicSQL), s);
+            System.out.println("open " + cursorText +" for "+DynamicSqlHelper.literalsToString(currentLiteralState));
+            return ns;
+        };
+        return fff;
     }
 
     public static Function<State, State> returnStmtFunc(StateFunc valueExpr) {
