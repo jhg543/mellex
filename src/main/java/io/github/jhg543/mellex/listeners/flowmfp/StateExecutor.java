@@ -116,8 +116,8 @@ public class StateExecutor {
 
     /**
      * @param whiteMan             newly generated X to be written
-     * @param nativeAmerican       the old X
-     * @param variableScopeChecker whether a variable is live in America
+     * @param nativeAmerican       the old X before Next instruction
+     * @param variableScopeChecker whether a variable is live in " just before Next instruction"
      * @return combined value or null is not modified
      */
     private static State compareAndCombineState(State whiteMan, State nativeAmerican, Predicate<VariableDefinition> variableScopeChecker) {

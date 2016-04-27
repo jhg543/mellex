@@ -31,6 +31,17 @@ public class NameResolver {
 
 	}
 
+	/**
+	 * @see AliasColumnResolver
+	 */
+	public void beginFromSubquery() {
+		alias.beginFromSubquery();
+	}
+
+	public void endFromSubquery() {
+		alias.endFromSubquery();
+	}
+
 	public void addFromSubQuery(String alias, SelectStmtData subquery) {
 		this.alias.addFromSubQuery(alias, subquery);
 	}

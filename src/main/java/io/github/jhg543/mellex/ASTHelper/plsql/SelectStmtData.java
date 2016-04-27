@@ -6,84 +6,85 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-import com.google.common.base.Preconditions;
-
 public class SelectStmtData {
-	protected List<ResultColumn> columns;
-	protected Map<String, Integer> nameIndexMap; // index is 0 based
-	protected List<VariableDefinition> intos;
+    protected List<ResultColumn> columns;
+    protected Map<String, Integer> nameIndexMap; // index is 0 based
+    protected List<VariableDefinition> intos;
 
-	public List<VariableDefinition> getIntos() {
-		return intos;
-	}
+    public SelectStmtData(List<ResultColumn> columns) {
+        super();
+        this.columns = columns;
+        this.nameIndexMap = new HashMap<>();
+        // SELECT A,A,A FROM X ---> names: A,A_1,A_2
+        IntStream.range(0, columns.size()).forEach(i -> {
+            String k = columns.get(i).getName();
+            String l = k;
+            int c = 0;
+            while (this.nameIndexMap.get(l) != null) {
+                c++;
+                l = k + "_" + c;
+            }
+            this.nameIndexMap.put(l, i);
+            if (c > 0) {
+                columns.get(i).setName(l);
+            }
+        });
 
-	public void setIntos(List<VariableDefinition> intos) {
-		this.intos = intos;
-	}
+    }
 
-	/**
-	 * do not modify it.
-	 * 
-	 * @return
-	 */
-	public List<ResultColumn> getColumns() {
-		return Collections.unmodifiableList(columns);
-	}
+    public List<VariableDefinition> getIntos() {
+        return intos;
+    }
 
-	/**
-	 * @param i
-	 *            zero based order
-	 * @return
-	 */
-	public StateFunc getColumnExprFunc(int i) {
-		return columns.get(i).getExpr();
-	}
+    public void setIntos(List<VariableDefinition> intos) {
+        this.intos = intos;
+    }
 
-	public StateFunc getColumnExprFunc(String name) {
-		return getColumnExprFunc(nameIndexMap.get(name));
-	}
+    /**
+     * do not modify it.
+     *
+     * @return
+     */
+    public List<ResultColumn> getColumns() {
+        return Collections.unmodifiableList(columns);
+    }
 
-	/**
-	 * do not modify the result collection
-	 * 
-	 * @return
-	 */
-	public Map<String, Integer> getNameIndexMap() {
-		return Collections.unmodifiableMap(nameIndexMap);
-	}
+    /**
+     * @param i zero based order
+     * @return
+     */
+    public StateFunc getColumnExprFunc(int i) {
+        return columns.get(i).getExpr();
+    }
 
-	public SelectStmtData(List<ResultColumn> columns) {
-		super();
-		this.columns = columns;
-		this.nameIndexMap = new HashMap<>();
-		// SELECT A,A,A FROM X ---> names: A,A_1,A_2
-		IntStream.range(0, columns.size()).forEach(i -> {
-			String k = columns.get(i).getName();
-			String l = k;
-			int c = 0;
-			while (this.nameIndexMap.get(l) != null) {
-				c++;
-				l = k + "_" + c;
-			}
-			this.nameIndexMap.put(l, i);
-			if (c > 0) {
-				columns.get(i).setName(l);
-			}
-		});
+    public StateFunc getColumnExprFunc(String name) {
+        Integer index = nameIndexMap.get(name);
+        if (index == null) {
+            return null;
+        }
+        return getColumnExprFunc(index);
+    }
 
-	}
+    /**
+     * do not modify the result collection
+     *
+     * @return
+     */
+    public Map<String, Integer> getNameIndexMap() {
+        return Collections.unmodifiableMap(nameIndexMap);
+    }
 
-	@Override
-	public String toString() {
-		String s = "SelectStmt [";
-		for (ResultColumn rc : columns) {
-			s += "\t";
-			s += rc.getName();
-			s += " = ";
-			s += rc.getExpr();
-		}
-		s += "]";
-		return s;
-	}
+    @Override
+    public String toString() {
+        String s = "SelectStmt [";
+        for (ResultColumn rc : columns) {
+            s += "\t";
+            s += rc.getName();
+            s += " = ";
+            s += rc.getExpr();
+        }
+        s += "]";
+        return s;
+    }
 
 }

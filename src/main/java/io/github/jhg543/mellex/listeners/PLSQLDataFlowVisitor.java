@@ -7,7 +7,6 @@ import io.github.jhg543.mellex.ASTHelper.symbol.NameResolver;
 import io.github.jhg543.mellex.ASTHelper.symbol.TableStorage;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPBaseVisitor;
 import io.github.jhg543.mellex.antlrparser.DefaultSQLPParser.*;
-import io.github.jhg543.mellex.inputsource.TableDefinitionProvider;
 import io.github.jhg543.mellex.listeners.flowmfp.*;
 import io.github.jhg543.mellex.util.DatabaseVendor;
 import io.github.jhg543.mellex.util.Misc;
@@ -40,7 +39,6 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
         return objects;
     }
 
-    private TableDefinitionProvider provider;
     private NameResolver nameResolver;
     private TokenStream stream;
     private String current_sql;
@@ -711,7 +709,9 @@ public class PLSQLDataFlowVisitor extends DefaultSQLPBaseVisitor<Object> {
 
     @Override
     public String visitTable_or_subquerySubQuery(Table_or_subquerySubQueryContext ctx) {
+        nameResolver.beginFromSubquery();
         SelectStmtData ss = (SelectStmtData) ctx.ss.accept(this);
+        nameResolver.endFromSubquery();
         String alias = ctx.ta.getText();
         nameResolver.addFromSubQuery(alias, ss);
         return alias;
